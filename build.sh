@@ -3,47 +3,12 @@
 # Falls back to static placeholder pages if the API is unavailable
 
 # Map of CRS codes to URL-friendly names
-declare -A STATION_MAP
-STATION_MAP=(
-  ["PAD"]="london-paddington"
-  ["KGX"]="london-kings-cross"
-  ["STP"]="london-st-pancras"
-  ["EUS"]="london-euston"
-  ["VIC"]="london-victoria"
-  ["WAT"]="london-waterloo"
-  ["LST"]="london-liverpool-street"
-  ["LBG"]="london-bridge"
-  ["BHM"]="birmingham-new-street"
-  ["MAN"]="manchester-piccadilly"
-  ["LIV"]="liverpool-lime-street"
-  ["LDS"]="leeds"
-  ["YRK"]="york"
-  ["NCL"]="newcastle"
-  ["EDB"]="edinburgh-waverley"
-  ["GLC"]="glasgow-central"
-  ["CDF"]="cardiff-central"
-  ["BRI"]="bristol-temple-meads"
-  ["EXD"]="exeter-st-davids"
-  ["PLY"]="plymouth"
-  ["RDG"]="reading"
-  ["OXF"]="oxford"
-  ["CBG"]="cambridge"
-  ["NRW"]="norwich"
-  ["BTN"]="brighton"
-  ["SOU"]="southampton-central"
-  ["NOT"]="nottingham"
-  ["SHF"]="sheffield"
-  ["DBY"]="derby"
-  ["LEI"]="leicester"
-  ["PRE"]="preston"
-  ["ABD"]="aberdeen"
-  ["INV"]="inverness"
-  ["SWA"]="swansea"
-)
+STATIONS="PAD:london-paddington KGX:london-kings-cross STP:london-st-pancras EUS:london-euston VIC:london-victoria WAT:london-waterloo LST:london-liverpool-street LBG:london-bridge BHM:birmingham-new-street MAN:manchester-piccadilly LIV:liverpool-lime-street LDS:leeds YRK:york NCL:newcastle EDB:edinburgh-waverley GLC:glasgow-central CDF:cardiff-central BRI:bristol-temple-meads EXD:exeter-st-davids PLY:plymouth RDG:reading OXF:oxford CBG:cambridge NRW:norwich BTN:brighton SOU:southampton-central NOT:nottingham SHF:sheffield DBY:derby LEI:leicester PRE:preston ABD:aberdeen INV:inverness SWA:swansea"
 
 echo "Generating station pages..."
-for crs in "${!STATION_MAP[@]}"; do
-  name="${STATION_MAP[$crs]}"
+for pair in $STATIONS; do
+  crs="${pair%%:*}"
+  name="${pair##*:}"
   python3 generate_station.py "$crs" > "station-${name}.html" 2>/dev/null
   if grep -q "Live data temporarily unavailable" "station-${name}.html" 2>/dev/null; then
     echo "  ${crs} (${name}) — fallback (API unavailable)"

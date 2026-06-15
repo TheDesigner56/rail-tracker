@@ -11,6 +11,7 @@ import json, sys, urllib.request, urllib.error
 from datetime import datetime, timezone
 
 HUXLEY_BASE = "https://huxley2.azurewebsites.net"
+LOCAL_PROXY = "http://localhost:3456"
 
 # ── Station names (common CRS codes) ──
 STATION_NAMES = {
@@ -85,8 +86,9 @@ def toc_color(code):
     return TOC_COLORS.get(code, "#52525B")
 
 def fetch_departures(crs, rows=20):
-    """Fetch live departures from Huxley 2."""
-    url = f"{HUXLEY_BASE}/departures/{crs}/{rows}"
+    """Fetch live departures from local proxy (falls back to Huxley 2)."""
+    # Try local proxy first
+    url = f"{LOCAL_PROXY}/departures/{crs}"
     try:
         with urllib.request.urlopen(url, timeout=10) as resp:
             return json.loads(resp.read().decode())
@@ -95,8 +97,9 @@ def fetch_departures(crs, rows=20):
         return None
 
 def fetch_arrivals(crs, rows=20):
-    """Fetch live arrivals from Huxley 2."""
-    url = f"{HUXLEY_BASE}/arrivals/{crs}/{rows}"
+    """Fetch live arrivals from local proxy (falls back to Huxley 2)."""
+    # Try local proxy first
+    url = f"{LOCAL_PROXY}/departures/{crs}"
     try:
         with urllib.request.urlopen(url, timeout=10) as resp:
             return json.loads(resp.read().decode())

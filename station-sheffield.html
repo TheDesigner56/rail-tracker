@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SHF · Sheffield — Live Departures & Arrivals</title>
+<meta name="description" content="Live train times for Sheffield (SHF). Real-time departures, arrivals, platform information, and delay tracking.">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif;
+    background: #0B0B0F; color: #E4E4E7; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 960px; margin: 0 auto; padding: 0 16px; }
+  .topbar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px; border-bottom: 1px solid #1E1E24;
+    position: sticky; top: 0; background: #0B0B0F; z-index: 10;
+  }
+  .topbar-logo {
+    font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em;
+    color: #fff; text-decoration: none; white-space: nowrap;
+  }
+  .topbar-logo span { color: #6366F1; }
+  .topbar-search {
+    flex: 1; background: #16161D; border: 1px solid #252530; border-radius: 10px;
+    padding: 8px 14px; font-size: 0.9rem; color: #A1A1AA; outline: none;
+  }
+  .topbar-search:focus { border-color: #6366F1; color: #E4E4E7; }
+  .topbar-search::placeholder { color: #52525B; }
+  .hero { padding: 32px 0 24px; display: flex; flex-direction: column; gap: 8px; }
+  .hero-code { font-size: clamp(3rem, 8vw, 5rem); font-weight: 800; letter-spacing: -0.03em; color: #fff; line-height: 1; }
+  .hero-name { font-size: 1.25rem; color: #A1A1AA; font-weight: 500; }
+  .hero-meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.9rem; color: #71717A; margin-top: 4px; }
+  .hero-meta-item { display: flex; align-items: center; gap: 6px; }
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid #1E1E24; margin-bottom: 24px; overflow-x: auto; }
+  .tab { padding: 10px 20px; font-size: 0.9rem; font-weight: 500; color: #71717A; background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+  .tab.active { color: #fff; border-bottom-color: #6366F1; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 28px; }
+  .stat-card { background: #121217; border: 1px solid #1E1E24; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 4px; }
+  .stat-label { font-size: 0.75rem; color: #71717A; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-value { font-size: 1.5rem; font-weight: 700; color: #fff; }
+  .stat-sub { font-size: 0.8rem; color: #A1A1AA; }
+  .stat-value.good { color: #22C55E; }
+  .stat-value.warn { color: #F59E0B; }
+  .stat-value.bad { color: #EF4444; }
+  .gauge-section { margin-bottom: 28px; }
+  .gauge-section h2 { font-size: 0.85rem; font-weight: 600; color: #A1A1AA; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+  .gauge-row { display: flex; flex-wrap: wrap; gap: 24px; }
+  .gauge { flex: 1; min-width: 200px; background: #121217; border: 1px solid #1E1E24; border-radius: 12px; padding: 20px; }
+  .gauge-title { font-size: 0.8rem; color: #71717A; margin-bottom: 8px; }
+  .gauge-bar-bg { height: 8px; background: #1E1E24; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+  .gauge-bar-fill { height: 100%; border-radius: 4px; }
+  .gauge-bar-fill.good { background: #22C55E; }
+  .gauge-bar-fill.warn { background: #F59E0B; }
+  .gauge-bar-fill.bad { background: #EF4444; }
+  .gauge-values { display: flex; justify-content: space-between; font-size: 0.85rem; }
+  .gauge-pct { font-weight: 700; }
+  .gauge-pct.good { color: #22C55E; }
+  .gauge-pct.warn { color: #F59E0B; }
+  .gauge-pct.bad { color: #EF4444; }
+  .gauge-avg { color: #71717A; }
+  .alerts { margin-bottom: 28px; }
+  .alert { display: flex; align-items: flex-start; gap: 10px; background: #422006; border: 1px solid #78350F; border-radius: 10px; padding: 12px 16px; margin-bottom: 8px; font-size: 0.85rem; }
+  .alert-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+  .alert-text { color: #FDE68A; }
+  .service-section { margin-bottom: 28px; }
+  .service-section h2 { font-size: 0.85rem; font-weight: 600; color: #A1A1AA; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+  .service-table { width: 100%; border-collapse: collapse; background: #121217; border: 1px solid #1E1E24; border-radius: 12px; overflow: hidden; }
+  .service-table th { text-align: left; padding: 10px 16px; font-size: 0.75rem; font-weight: 600; color: #71717A; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #1E1E24; background: #0E0E13; }
+  .service-table td { padding: 12px 16px; font-size: 0.9rem; border-bottom: 1px solid #1A1A20; vertical-align: middle; }
+  .service-table tr:last-child td { border-bottom: none; }
+  .service-table tr:hover td { background: #16161D; }
+  .toc-badge { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 0.85rem; }
+  .toc-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .time-scheduled { color: #71717A; font-size: 0.8rem; }
+  .time-actual { font-weight: 600; }
+  .time-actual.on-time { color: #22C55E; }
+  .time-actual.late { color: #F59E0B; }
+  .time-actual.cancelled { color: #EF4444; text-decoration: line-through; }
+  .platform { display: inline-block; background: #1E1E24; color: #D4D4D8; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 0.85rem; min-width: 28px; text-align: center; }
+  .platform.changed { background: #422006; color: #F59E0B; }
+  .status-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+  .status-badge.on-time { background: #052E16; color: #22C55E; }
+  .status-badge.late { background: #422006; color: #F59E0B; }
+  .status-badge.cancelled { background: #3B0A0A; color: #EF4444; }
+  .footer { border-top: 1px solid #1E1E24; padding: 20px 0 32px; font-size: 0.8rem; color: #52525B; display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; }
+  .footer a { color: #71717A; text-decoration: none; }
+  .footer a:hover { color: #A1A1AA; }
+  .data-refresh { font-size: 0.75rem; color: #52525B; margin-bottom: 8px; }
+  @media (max-width: 640px) {
+    .page { padding: 0 12px; }
+    .hero { padding: 20px 0 16px; }
+    .stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .stat-card { padding: 12px; }
+    .stat-value { font-size: 1.25rem; }
+    .gauge-row { flex-direction: column; gap: 12px; }
+    .service-table th, .service-table td { padding: 8px 10px; }
+    .service-table th:nth-child(5), .service-table td:nth-child(5) { display: none; }
+    .tab { padding: 8px 14px; font-size: 0.8rem; }
+  }
+  @media (max-width: 380px) {
+    .service-table th:nth-child(4), .service-table td:nth-child(4) { display: none; }
+    .stats { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <a href="/" class="topbar-logo">rail<span>tracker</span></a>
+  <input type="search" class="topbar-search" placeholder="Search stations..." aria-label="Search stations">
+</nav>
+
+<div class="page">
+
+<div class="hero">
+  <h1 class="hero-code">SHF</h1>
+  <p class="hero-name">Sheffield</p>
+  <div class="hero-meta">
+    <span class="hero-meta-item">📍 London, GB</span>
+    <span class="hero-meta-item">🕐 16:53 BST</span>
+    <span class="hero-meta-item">🚆 Live data via Darwin</span>
+  </div>
+</div>
+
+<nav class="tabs" role="tablist">
+  <button class="tab active" role="tab" aria-selected="true">Overview</button>
+  <button class="tab" role="tab">Departures</button>
+  <button class="tab" role="tab">Arrivals</button>
+  <button class="tab" role="tab">Station Info</button>
+</nav>
+
+<div class="stats">
+  <div class="stat-card">
+    <span class="stat-label">Departures (next 2h)</span>
+    <span class="stat-value">43</span>
+    <span class="stat-sub">services listed</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-label">On Time</span>
+    <span class="stat-value warn">79%</span>
+    <span class="stat-sub">34 of 43</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-label">Avg Delay</span>
+    <span class="stat-value warn">0m</span>
+    <span class="stat-sub">9 delayed</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-label">Cancellations</span>
+    <span class="stat-value good">0</span>
+    <span class="stat-sub">today</span>
+  </div>
+</div>
+
+<div class="gauge-section">
+  <h2>Current Performance</h2>
+  <div class="gauge-row">
+    <div class="gauge">
+      <div class="gauge-title">Departures — On Time</div>
+      <div class="gauge-bar-bg">
+        <div class="gauge-bar-fill warn" style="width:79%"></div>
+      </div>
+      <div class="gauge-values">
+        <span class="gauge-pct warn">79%</span>
+        <span class="gauge-avg">Avg delay 0 min</span>
+      </div>
+    </div>
+    <div class="gauge">
+      <div class="gauge-title">Arrivals — On Time</div>
+      <div class="gauge-bar-bg">
+        <div class="gauge-bar-fill warn" style="width:79%"></div>
+      </div>
+      <div class="gauge-values">
+        <span class="gauge-pct warn">79%</span>
+        <span class="gauge-avg">Avg delay 0 min</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+<div class="service-section">
+  <h2>Upcoming Departures</h2>
+  <p class="data-refresh">Live data · Generated 16:53</p>
+  <table class="service-table">
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Operator</th>
+        <th>Destination</th>
+        <th>Platform</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="time-actual late">1633</span><br><span class="time-scheduled">Sched 1631</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>Terminates here</td>
+        <td><span class="platform changed">4</span></td>
+        <td><span class="status-badge late">1633</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual late">1635½</span><br><span class="time-scheduled">Sched 1635</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#6950A8"></span>Elizabeth Line</span></td>
+        <td>Huddersfield</td>
+        <td><span class="platform changed">1B</span></td>
+        <td><span class="status-badge late">1635½</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual late">1634¾</span><br><span class="time-scheduled">Sched 1635</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>St Pancras International</td>
+        <td><span class="platform changed">8</span></td>
+        <td><span class="status-badge late">1634¾</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual late">1640½</span><br><span class="time-scheduled">Sched 1637</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>Lincoln Central</td>
+        <td><span class="platform changed">4</span></td>
+        <td><span class="status-badge late">1640½</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual on-time">1710</span><br><span class="time-scheduled">Sched 1710</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#6950A8"></span>Elizabeth Line</span></td>
+        <td>Norwich</td>
+        <td><span class="platform">5A</span></td>
+        <td><span class="status-badge on-time">On time</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual late">1648½</span><br><span class="time-scheduled">Sched 1641</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>Terminates here</td>
+        <td><span class="platform changed">2</span></td>
+        <td><span class="status-badge late">1648½</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual late">1649¾</span><br><span class="time-scheduled">Sched 1643</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#6950A8"></span>Elizabeth Line</span></td>
+        <td>Liverpool Lime Street</td>
+        <td><span class="platform changed">7</span></td>
+        <td><span class="status-badge late">1649¾</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual late">1646</span><br><span class="time-scheduled">Sched 1648</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>Terminates here</td>
+        <td><span class="platform changed">5</span></td>
+        <td><span class="status-badge late">1646</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual late">1648</span><br><span class="time-scheduled">Sched 1648</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>Leeds</td>
+        <td><span class="platform changed">3</span></td>
+        <td><span class="status-badge late">1648</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual late">1652¾</span><br><span class="time-scheduled">Sched 1651</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#00A650"></span>TransPennine Express</span></td>
+        <td>Terminates here</td>
+        <td><span class="platform changed">3</span></td>
+        <td><span class="status-badge late">1652¾</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual on-time">1652</span><br><span class="time-scheduled">Sched 1652</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>LeedsAt platform</td>
+        <td><span class="platform">4</span></td>
+        <td><span class="status-badge on-time">On time</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual on-time">1659</span><br><span class="time-scheduled">Sched 1659</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>Cardiff Central & Plymouth</td>
+        <td><span class="platform">6</span></td>
+        <td><span class="status-badge on-time">On time</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual on-time">1657</span><br><span class="time-scheduled">Sched 1657</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>ScarboroughAt platform</td>
+        <td><span class="platform">5</span></td>
+        <td><span class="status-badge on-time">On time</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual on-time">1700</span><br><span class="time-scheduled">Sched 1700</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>St Pancras InternationalAt platform</td>
+        <td><span class="platform">2</span></td>
+        <td><span class="status-badge on-time">On time</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual on-time">1705</span><br><span class="time-scheduled">Sched 1705</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#00A650"></span>TransPennine Express</span></td>
+        <td>Terminates here</td>
+        <td><span class="platform">4A</span></td>
+        <td><span class="status-badge on-time">On time</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="service-section">
+  <h2>Recent Arrivals</h2>
+  <table class="service-table">
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Operator</th>
+        <th>Origin</th>
+        <th>Platform</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="time-actual late">1633</span><br><span class="time-scheduled">Sched 1631</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>Terminates here</td>
+        <td><span class="platform changed">4</span></td>
+        <td><span class="status-badge late">1633</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual late">1635½</span><br><span class="time-scheduled">Sched 1635</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#6950A8"></span>Elizabeth Line</span></td>
+        <td>Huddersfield</td>
+        <td><span class="platform changed">1B</span></td>
+        <td><span class="status-badge late">1635½</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual late">1634¾</span><br><span class="time-scheduled">Sched 1635</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>St Pancras International</td>
+        <td><span class="platform changed">8</span></td>
+        <td><span class="status-badge late">1634¾</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual late">1640½</span><br><span class="time-scheduled">Sched 1637</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>Lincoln Central</td>
+        <td><span class="platform changed">4</span></td>
+        <td><span class="status-badge late">1640½</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual on-time">1710</span><br><span class="time-scheduled">Sched 1710</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#6950A8"></span>Elizabeth Line</span></td>
+        <td>Norwich</td>
+        <td><span class="platform">5A</span></td>
+        <td><span class="status-badge on-time">On time</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual late">1648½</span><br><span class="time-scheduled">Sched 1641</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>Terminates here</td>
+        <td><span class="platform changed">2</span></td>
+        <td><span class="status-badge late">1648½</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual late">1649¾</span><br><span class="time-scheduled">Sched 1643</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#6950A8"></span>Elizabeth Line</span></td>
+        <td>Liverpool Lime Street</td>
+        <td><span class="platform changed">7</span></td>
+        <td><span class="status-badge late">1649¾</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual late">1646</span><br><span class="time-scheduled">Sched 1648</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>Terminates here</td>
+        <td><span class="platform changed">5</span></td>
+        <td><span class="status-badge late">1646</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual late">1648</span><br><span class="time-scheduled">Sched 1648</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>Leeds</td>
+        <td><span class="platform changed">3</span></td>
+        <td><span class="status-badge late">1648</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual late">1652¾</span><br><span class="time-scheduled">Sched 1651</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#00A650"></span>TransPennine Express</span></td>
+        <td>Terminates here</td>
+        <td><span class="platform changed">3</span></td>
+        <td><span class="status-badge late">1652¾</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual on-time">1652</span><br><span class="time-scheduled">Sched 1652</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>LeedsAt platform</td>
+        <td><span class="platform">4</span></td>
+        <td><span class="status-badge on-time">On time</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual on-time">1659</span><br><span class="time-scheduled">Sched 1659</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>Cardiff Central & Plymouth</td>
+        <td><span class="platform">6</span></td>
+        <td><span class="status-badge on-time">On time</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual on-time">1657</span><br><span class="time-scheduled">Sched 1657</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>ScarboroughAt platform</td>
+        <td><span class="platform">5</span></td>
+        <td><span class="status-badge on-time">On time</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual on-time">1700</span><br><span class="time-scheduled">Sched 1700</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#0A5C36"></span>Great Western Railway</span></td>
+        <td>St Pancras InternationalAt platform</td>
+        <td><span class="platform">2</span></td>
+        <td><span class="status-badge on-time">On time</span></td>
+      </tr>
+      <tr>
+        <td><span class="time-actual on-time">1705</span><br><span class="time-scheduled">Sched 1705</span></td>
+        <td><span class="toc-badge"><span class="toc-dot" style="background:#00A650"></span>TransPennine Express</span></td>
+        <td>Terminates here</td>
+        <td><span class="platform">4A</span></td>
+        <td><span class="status-badge on-time">On time</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<footer class="footer">
+  <span>Data: National Rail Darwin · via Huxley 2 · Open data licensed under OGL v3.0</span>
+  <span><a href="/about">About</a> · <a href="/data">Data Sources</a> · <a href="/stations">All Stations</a></span>
+</footer>
+
+</div>
+
+</body>
+</html>
