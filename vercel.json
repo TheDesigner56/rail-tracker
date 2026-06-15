@@ -1,11 +1,11 @@
 {
-  "buildCommand": "echo 'No build needed — static HTML + Python generator'",
+  "buildCommand": "python3 generate_station.py PAD > station-live.html && python3 generate_station.py KGX > station-kgx.html && python3 generate_station.py MAN > station-man.html && python3 generate_station.py BRI > station-bri.html && python3 generate_station.py EDB > station-edb.html && python3 generate_station.py GLC > station-glc.html && echo 'Build complete'",
   "outputDirectory": ".",
-  "installCommand": "pip3 install -r requirements.txt 2>/dev/null || echo 'No deps'",
+  "installCommand": "echo 'No dependencies — stdlib only'",
   "routes": [
     {
       "src": "/stations/(?<crs>[A-Z]{3})",
-      "dest": "/api/station.py?crs=$crs"
+      "dest": "/station-live.html"
     },
     {
       "src": "/",
@@ -15,5 +15,6 @@
       "src": "/(.*)",
       "dest": "/$1"
     }
-  ]
+  ],
+  "framework": null
 }
