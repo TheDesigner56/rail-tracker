@@ -1,0 +1,19 @@
+{
+  "buildCommand": "echo 'No build needed — static HTML + Python generator'",
+  "outputDirectory": ".",
+  "installCommand": "pip3 install -r requirements.txt 2>/dev/null || echo 'No deps'",
+  "routes": [
+    {
+      "src": "/stations/(?<crs>[A-Z]{3})",
+      "dest": "/api/station.py?crs=$crs"
+    },
+    {
+      "src": "/",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ]
+}

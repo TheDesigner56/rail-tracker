@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PAD · London Paddington — Live Departures & Arrivals</title>
+<meta name="description" content="Live train times for London Paddington (PAD). Departures, arrivals, platform information, and real-time delay tracking for GWR, Heathrow Express, and Elizabeth Line services.">
+<style>
+  /* ── Reset & Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif;
+    background: #0B0B0F;
+    color: #E4E4E7;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ── */
+  .page { max-width: 960px; margin: 0 auto; padding: 0 16px; }
+
+  /* ── Top Bar ── */
+  .topbar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px; border-bottom: 1px solid #1E1E24;
+    position: sticky; top: 0; background: #0B0B0F; z-index: 10;
+  }
+  .topbar-logo {
+    font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em;
+    color: #fff; text-decoration: none; white-space: nowrap;
+  }
+  .topbar-logo span { color: #6366F1; }
+  .topbar-search {
+    flex: 1; background: #16161D; border: 1px solid #252530; border-radius: 10px;
+    padding: 8px 14px; font-size: 0.9rem; color: #A1A1AA; outline: none;
+    transition: border-color 0.15s;
+  }
+  .topbar-search:focus { border-color: #6366F1; color: #E4E4E7; }
+  .topbar-search::placeholder { color: #52525B; }
+
+  /* ── Station Hero ── */
+  .hero {
+    padding: 32px 0 24px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .hero-code {
+    font-size: clamp(3rem, 8vw, 5rem);
+    font-weight: 800; letter-spacing: -0.03em;
+    color: #fff; line-height: 1;
+  }
+  .hero-name {
+    font-size: 1.25rem; color: #A1A1AA; font-weight: 500;
+  }
+  .hero-meta {
+    display: flex; flex-wrap: wrap; gap: 16px;
+    font-size: 0.9rem; color: #71717A; margin-top: 4px;
+  }
+  .hero-meta-item { display: flex; align-items: center; gap: 6px; }
+  .hero-meta-icon { font-size: 1.1rem; }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex; gap: 0; border-bottom: 1px solid #1E1E24;
+    margin-bottom: 24px; overflow-x: auto;
+  }
+  .tab {
+    padding: 10px 20px; font-size: 0.9rem; font-weight: 500;
+    color: #71717A; background: none; border: none; cursor: pointer;
+    border-bottom: 2px solid transparent; white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .tab.active { color: #fff; border-bottom-color: #6366F1; }
+  .tab:hover { color: #D4D4D8; }
+
+  /* ── Stats Row ── */
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px; margin-bottom: 28px;
+  }
+  .stat-card {
+    background: #121217; border: 1px solid #1E1E24; border-radius: 12px;
+    padding: 16px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .stat-label { font-size: 0.75rem; color: #71717A; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-value { font-size: 1.5rem; font-weight: 700; color: #fff; }
+  .stat-sub { font-size: 0.8rem; color: #A1A1AA; }
+  .stat-value.good { color: #22C55E; }
+  .stat-value.warn { color: #F59E0B; }
+  .stat-value.bad { color: #EF4444; }
+
+  /* ── Delay Gauge ── */
+  .gauge-section { margin-bottom: 28px; }
+  .gauge-section h2 {
+    font-size: 0.85rem; font-weight: 600; color: #A1A1AA;
+    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;
+  }
+  .gauge-row {
+    display: flex; flex-wrap: wrap; gap: 24px;
+  }
+  .gauge {
+    flex: 1; min-width: 200px;
+    background: #121217; border: 1px solid #1E1E24; border-radius: 12px;
+    padding: 20px;
+  }
+  .gauge-title { font-size: 0.8rem; color: #71717A; margin-bottom: 8px; }
+  .gauge-bar-bg {
+    height: 8px; background: #1E1E24; border-radius: 4px; overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .gauge-bar-fill {
+    height: 100%; border-radius: 4px; transition: width 0.5s ease;
+  }
+  .gauge-bar-fill.good { background: #22C55E; }
+  .gauge-bar-fill.warn { background: #F59E0B; }
+  .gauge-bar-fill.bad { background: #EF4444; }
+  .gauge-values {
+    display: flex; justify-content: space-between;
+    font-size: 0.85rem;
+  }
+  .gauge-pct { font-weight: 700; }
+  .gauge-pct.good { color: #22C55E; }
+  .gauge-pct.warn { color: #F59E0B; }
+  .gauge-pct.bad { color: #EF4444; }
+  .gauge-avg { color: #71717A; }
+
+  /* ── Disruption Timeline ── */
+  .timeline {
+    background: #121217; border: 1px solid #1E1E24; border-radius: 12px;
+    padding: 20px; margin-bottom: 28px;
+  }
+  .timeline-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 16px;
+  }
+  .timeline-title { font-size: 0.85rem; font-weight: 600; color: #A1A1AA; text-transform: uppercase; letter-spacing: 0.05em; }
+  .timeline-range { font-size: 0.8rem; color: #52525B; }
+  .timeline-chart {
+    display: flex; align-items: flex-end; gap: 3px;
+    height: 80px; padding: 0 4px;
+  }
+  .timeline-bar {
+    flex: 1; border-radius: 2px 2px 0 0; min-width: 4px;
+    transition: height 0.3s;
+  }
+  .timeline-bar.good { background: #22C55E; opacity: 0.7; }
+  .timeline-bar.warn { background: #F59E0B; opacity: 0.7; }
+  .timeline-bar.bad { background: #EF4444; opacity: 0.7; }
+  .timeline-labels {
+    display: flex; justify-content: space-between;
+    font-size: 0.7rem; color: #52525B; margin-top: 8px;
+  }
+
+  /* ── Service Table ── */
+  .service-section { margin-bottom: 28px; }
+  .service-section h2 {
+    font-size: 0.85rem; font-weight: 600; color: #A1A1AA;
+    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;
+  }
+  .service-table {
+    width: 100%; border-collapse: collapse;
+    background: #121217; border: 1px solid #1E1E24; border-radius: 12px;
+    overflow: hidden;
+  }
+  .service-table th {
+    text-align: left; padding: 10px 16px;
+    font-size: 0.75rem; font-weight: 600; color: #71717A;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    border-bottom: 1px solid #1E1E24; background: #0E0E13;
+  }
+  .service-table td {
+    padding: 12px 16px; font-size: 0.9rem;
+    border-bottom: 1px solid #1A1A20;
+    vertical-align: middle;
+  }
+  .service-table tr:last-child td { border-bottom: none; }
+  .service-table tr:hover td { background: #16161D; }
+  .toc-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-weight: 600; font-size: 0.85rem;
+  }
+  .toc-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .toc-dot.gwr { background: #0A5C36; }
+  .toc-dot.hx { background: #532B88; }
+  .toc-dot.el { background: #6950A8; }
+  .time-scheduled { color: #71717A; font-size: 0.8rem; }
+  .time-actual { font-weight: 600; }
+  .time-actual.on-time { color: #22C55E; }
+  .time-actual.late { color: #F59E0B; }
+  .time-actual.cancelled { color: #EF4444; text-decoration: line-through; }
+  .platform {
+    display: inline-block; background: #1E1E24; color: #D4D4D8;
+    padding: 2px 8px; border-radius: 4px; font-weight: 600;
+    font-size: 0.85rem; min-width: 28px; text-align: center;
+  }
+  .platform.changed { background: #422006; color: #F59E0B; }
+  .status-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 0.75rem; font-weight: 600;
+  }
+  .status-badge.on-time { background: #052E16; color: #22C55E; }
+  .status-badge.late { background: #422006; color: #F59E0B; }
+  .status-badge.cancelled { background: #3B0A0A; color: #EF4444; }
+
+  /* ── Alerts ── */
+  .alerts { margin-bottom: 28px; }
+  .alert {
+    display: flex; align-items: flex-start; gap: 10px;
+    background: #422006; border: 1px solid #78350F; border-radius: 10px;
+    padding: 12px 16px; margin-bottom: 8px;
+    font-size: 0.85rem;
+  }
+  .alert-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+  .alert-text { color: #FDE68A; }
+  .alert-text strong { color: #FBBF24; }
+
+  /* ── Footer ── */
+  .footer {
+    border-top: 1px solid #1E1E24; padding: 20px 0 32px;
+    font-size: 0.8rem; color: #52525B; display: flex;
+    flex-wrap: wrap; gap: 16px; justify-content: space-between;
+  }
+  .footer a { color: #71717A; text-decoration: none; }
+  .footer a:hover { color: #A1A1AA; }
+
+  /* ── Mobile ── */
+  @media (max-width: 640px) {
+    .page { padding: 0 12px; }
+    .hero { padding: 20px 0 16px; }
+    .stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .stat-card { padding: 12px; }
+    .stat-value { font-size: 1.25rem; }
+    .gauge-row { flex-direction: column; gap: 12px; }
+    .service-table { font-size: 0.8rem; }
+    .service-table th, .service-table td { padding: 8px 10px; }
+    .service-table th:nth-child(5),
+    .service-table td:nth-child(5) { display: none; }
+    .timeline-chart { height: 60px; }
+    .tab { padding: 8px 14px; font-size: 0.8rem; }
+  }
+
+  @media (max-width: 380px) {
+    .service-table th:nth-child(4),
+    .service-table td:nth-child(4) { display: none; }
+    .stats { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Top Bar ── -->
+<nav class="topbar">
+  <a href="/" class="topbar-logo">rail<span>tracker</span></a>
+  <input type="search" class="topbar-search" placeholder="Search stations..." aria-label="Search stations">
+</nav>
+
+<div class="page">
+
+<!-- ── Station Hero ── -->
+<div class="hero">
+  <h1 class="hero-code">PAD</h1>
+  <p class="hero-name">London Paddington</p>
+  <div class="hero-meta">
+    <span class="hero-meta-item">📍 London, GB</span>
+    <span class="hero-meta-item">🕐 07:32 BST</span>
+    <span class="hero-meta-item">🌤 16°C</span>
+    <span class="hero-meta-item">🚆 14 platforms</span>
+  </div>
+</div>
+
+<!-- ── Tabs ── -->
+<nav class="tabs" role="tablist">
+  <button class="tab active" role="tab" aria-selected="true">Overview</button>
+  <button class="tab" role="tab">Departures</button>
+  <button class="tab" role="tab">Arrivals</button>
+  <button class="tab" role="tab">Platforms</button>
+  <button class="tab" role="tab">Station Info</button>
+</nav>
+
+<!-- ── Stats Row ── -->
+<div class="stats">
+  <div class="stat-card">
+    <span class="stat-label">Services Today</span>
+    <span class="stat-value">247</span>
+    <span class="stat-sub">+12 vs avg</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-label">On Time</span>
+    <span class="stat-value good">84%</span>
+    <span class="stat-sub">Last hour</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-label">Avg Delay</span>
+    <span class="stat-value warn">6m</span>
+    <span class="stat-sub">Departures</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-label">Cancellations</span>
+    <span class="stat-value bad">3</span>
+    <span class="stat-sub">Today</span>
+  </div>
+</div>
+
+<!-- ── Delay Gauge ── -->
+<div class="gauge-section">
+  <h2>Current Performance</h2>
+  <div class="gauge-row">
+    <div class="gauge">
+      <div class="gauge-title">Departures — On Time</div>
+      <div class="gauge-bar-bg">
+        <div class="gauge-bar-fill good" style="width:84%"></div>
+      </div>
+      <div class="gauge-values">
+        <span class="gauge-pct good">84%</span>
+        <span class="gauge-avg">Avg delay 6 min</span>
+      </div>
+    </div>
+    <div class="gauge">
+      <div class="gauge-title">Arrivals — On Time</div>
+      <div class="gauge-bar-bg">
+        <div class="gauge-bar-fill warn" style="width:71%"></div>
+      </div>
+      <div class="gauge-values">
+        <span class="gauge-pct warn">71%</span>
+        <span class="gauge-avg">Avg delay 11 min</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Disruption Timeline ── -->
+<div class="timeline">
+  <div class="timeline-header">
+    <span class="timeline-title">Punctuality — Last 24 Hours</span>
+    <span class="timeline-range">Mon 07:00 — Tue 07:00</span>
+  </div>
+  <div class="timeline-chart" aria-label="Punctuality chart: 24 bars showing hourly on-time percentage">
+    <div class="timeline-bar good" style="height:85%"></div>
+    <div class="timeline-bar good" style="height:90%"></div>
+    <div class="timeline-bar good" style="height:88%"></div>
+    <div class="timeline-bar good" style="height:82%"></div>
+    <div class="timeline-bar good" style="height:86%"></div>
+    <div class="timeline-bar good" style="height:91%"></div>
+    <div class="timeline-bar good" style="height:84%"></div>
+    <div class="timeline-bar warn" style="height:65%"></div>
+    <div class="timeline-bar warn" style="height:58%"></div>
+    <div class="timeline-bar bad" style="height:42%"></div>
+    <div class="timeline-bar bad" style="height:35%"></div>
+    <div class="timeline-bar warn" style="height:55%"></div>
+    <div class="timeline-bar warn" style="height:62%"></div>
+    <div class="timeline-bar good" style="height:78%"></div>
+    <div class="timeline-bar good" style="height:80%"></div>
+    <div class="timeline-bar good" style="height:83%"></div>
+    <div class="timeline-bar good" style="height:87%"></div>
+    <div class="timeline-bar good" style="height:85%"></div>
+    <div class="timeline-bar good" style="height:89%"></div>
+    <div class="timeline-bar good" style="height:92%"></div>
+    <div class="timeline-bar good" style="height:88%"></div>
+    <div class="timeline-bar good" style="height:86%"></div>
+    <div class="timeline-bar good" style="height:90%"></div>
+    <div class="timeline-bar good" style="height:84%"></div>
+  </div>
+  <div class="timeline-labels">
+    <span>07:00</span><span>10:00</span><span>13:00</span><span>16:00</span><span>19:00</span><span>22:00</span><span>01:00</span><span>04:00</span><span>Now</span>
+  </div>
+</div>
+
+<!-- ── Alerts ── -->
+<div class="alerts">
+  <div class="alert">
+    <span class="alert-icon">⚠️</span>
+    <span class="alert-text"><strong>Signalling fault</strong> at Slough — residual delays of up to 15 minutes on services towards Reading. Expected to clear by 09:00.</span>
+  </div>
+  <div class="alert">
+    <span class="alert-icon">🚧</span>
+    <span class="alert-text"><strong>Planned engineering</strong> — No Heathrow Express service this Sunday 22 June. Replacement bus service from Ealing Broadway.</span>
+  </div>
+</div>
+
+<!-- ── Departures Table ── -->
+<div class="service-section">
+  <h2>Upcoming Departures</h2>
+  <table class="service-table">
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Operator</th>
+        <th>Destination</th>
+        <th>Platform</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <span class="time-actual on-time">07:36</span>
+          <br><span class="time-scheduled">Sched 07:36</span>
+        </td>
+        <td><span class="toc-badge"><span class="toc-dot gwr"></span>GWR</span></td>
+        <td>Bristol Temple Meads <span style="color:#71717A;font-size:0.8rem;">via Bath Spa</span></td>
+        <td><span class="platform">12</span></td>
+        <td><span class="status-badge on-time">On time</span></td>
+      </tr>
+      <tr>
+        <td>
+          <span class="time-actual late">07:42</span>
+          <br><span class="time-scheduled">Sched 07:38</span>
+        </td>
+        <td><span class="toc-badge"><span class="toc-dot hx"></span>Heathrow Exp</span></td>
+        <td>Heathrow Terminal 5</td>
+        <td><span class="platform changed">7</span></td>
+        <td><span class="status-badge late">4m late</span></td>
+      </tr>
+      <tr>
+        <td>
+          <span class="time-actual on-time">07:45</span>
+          <br><span class="time-scheduled">Sched 07:45</span>
+        </td>
+        <td><span class="toc-badge"><span class="toc-dot el"></span>Elizabeth</span></td>
+        <td>Abbey Wood <span style="color:#71717A;font-size:0.8rem;">via Liverpool St</span></td>
+        <td><span class="platform">A</span></td>
+        <td><span class="status-badge on-time">On time</span></td>
+      </tr>
+      <tr>
+        <td>
+          <span class="time-actual on-time">07:48</span>
+          <br><span class="time-scheduled">Sched 07:48</span>
+        </td>
+        <td><span class="toc-badge"><span class="toc-dot gwr"></span>GWR</span></td>
+        <td>Cardiff Central <span style="color:#71717A;font-size:0.8rem;">via Newport</span></td>
+        <td><span class="platform">9</span></td>
+        <td><span class="status-badge on-time">On time</span></td>
+      </tr>
+      <tr>
+        <td>
+          <span class="time-actual cancelled">07:52</span>
+          <br><span class="time-scheduled">Sched 07:52</span>
+        </td>
+        <td><span class="toc-badge"><span class="toc-dot gwr"></span>GWR</span></td>
+        <td>Oxford</td>
+        <td><span class="platform">—</span></td>
+        <td><span class="status-badge cancelled">Cancelled</span></td>
+      </tr>
+      <tr>
+        <td>
+          <span class="time-actual on-time">08:00</span>
+          <br><span class="time-scheduled">Sched 08:00</span>
+        </td>
+        <td><span class="toc-badge"><span class="toc-dot hx"></span>Heathrow Exp</span></td>
+        <td>Heathrow Terminal 5</td>
+        <td><span class="platform">6</span></td>
+        <td><span class="status-badge on-time">On time</span></td>
+      </tr>
+      <tr>
+        <td>
+          <span class="time-actual late">08:06</span>
+          <br><span class="time-scheduled">Sched 08:03</span>
+        </td>
+        <td><span class="toc-badge"><span class="toc-dot gwr"></span>GWR</span></td>
+        <td>Penzance <span style="color:#71717A;font-size:0.8rem;">via Plymouth</span></td>
+        <td><span class="platform">11</span></td>
+        <td><span class="status-badge late">3m late</span></td>
+      </tr>
+      <tr>
+        <td>
+          <span class="time-actual on-time">08:15</span>
+          <br><span class="time-scheduled">Sched 08:15</span>
+        </td>
+        <td><span class="toc-badge"><span class="toc-dot el"></span>Elizabeth</span></td>
+        <td>Shenfield <span style="color:#71717A;font-size:0.8rem;">via Stratford</span></td>
+        <td><span class="platform">B</span></td>
+        <td><span class="status-badge on-time">On time</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ── Footer ── -->
+<footer class="footer">
+  <span>Data: Network Rail · National Rail · TfL · Open data licensed under OGL v3.0</span>
+  <span><a href="/about">About</a> · <a href="/data">Data Sources</a> · <a href="/stations">All Stations</a></span>
+</footer>
+
+</div><!-- .page -->
+
+</body>
+</html>

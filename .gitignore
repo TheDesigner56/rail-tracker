@@ -1,0 +1,16 @@
+# Screenshots
+*.png
+# Generated station pages
+station-live.html
+station-kgx.html
+station-man.html
+station-bri.html
+# Python cache
+__pycache__/
+*.pyc
+# OS
+.DS_Store
+Thumbs.db
+# IDE
+.vscode/
+.idea/
