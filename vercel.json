@@ -4,6 +4,8 @@
   "installCommand": "echo 'No dependencies — stdlib only'",
   "routes": [
     { "src": "/", "dest": "/index.html" },
+    { "src": "/stations/(?<slug>[a-z-]+)", "dest": "/station-$slug.html" },
+    { "src": "/station-(?<code>[A-Z]{3})", "dest": "/station-$code.html" },
     { "src": "/(.*)", "dest": "/$1" }
   ],
   "framework": null
