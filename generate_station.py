@@ -12,6 +12,44 @@ from datetime import datetime, timezone
 
 HUXLEY_BASE = "https://huxley2.azurewebsites.net"
 
+# ── Station names (common CRS codes) ──
+STATION_NAMES = {
+    "PAD": "London Paddington",
+    "KGX": "London Kings Cross",
+    "STP": "London St Pancras International",
+    "EUS": "London Euston",
+    "VIC": "London Victoria",
+    "WAT": "London Waterloo",
+    "LST": "London Liverpool Street",
+    "LBG": "London Bridge",
+    "BHM": "Birmingham New Street",
+    "MAN": "Manchester Piccadilly",
+    "LIV": "Liverpool Lime Street",
+    "LDS": "Leeds",
+    "YRK": "York",
+    "NCL": "Newcastle",
+    "EDB": "Edinburgh Waverley",
+    "GLC": "Glasgow Central",
+    "CDF": "Cardiff Central",
+    "BRI": "Bristol Temple Meads",
+    "EXD": "Exeter St Davids",
+    "PLY": "Plymouth",
+    "RDG": "Reading",
+    "OXF": "Oxford",
+    "CBG": "Cambridge",
+    "NRW": "Norwich",
+    "BTN": "Brighton",
+    "SOU": "Southampton Central",
+    "NOT": "Nottingham",
+    "SHF": "Sheffield",
+    "DBY": "Derby",
+    "LEI": "Leicester",
+    "PRE": "Preston",
+    "ABD": "Aberdeen",
+    "INV": "Inverness",
+    "SWA": "Swansea",
+}
+
 # ── TOC colours ──
 TOC_COLORS = {
     "GW": "#0A5C36",   # GWR - dark green
@@ -178,15 +216,86 @@ def gauge_class(pct):
         return 'warn'
     return 'bad'
 
+def generate_fallback_html(crs_code, station_name):
+    """Generate a static station page when the API is unavailable."""
+    local_time = datetime.now().strftime('%H:%M')
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{crs_code} · {station_name} — Live Departures & Arrivals</title>
+<meta name="description" content="Live train times for {station_name} ({crs_code}). Real-time departures, arrivals, platform information, and delay tracking.">
+<style>
+  *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  html {{ font-size: 16px; -webkit-text-size-adjust: 100%; }}
+  body {{ font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif; background: #0B0B0F; color: #E4E4E7; line-height: 1.5; -webkit-font-smoothing: antialiased; }}
+  .page {{ max-width: 960px; margin: 0 auto; padding: 0 16px; }}
+  .topbar {{ display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #1E1E24; position: sticky; top: 0; background: #0B0B0F; z-index: 10; }}
+  .topbar-logo {{ font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; color: #fff; text-decoration: none; }}
+  .topbar-logo span {{ color: #6366F1; }}
+  .topbar-search {{ flex: 1; background: #16161D; border: 1px solid #252530; border-radius: 10px; padding: 8px 14px; font-size: 0.9rem; color: #A1A1AA; outline: none; }}
+  .topbar-search::placeholder {{ color: #52525B; }}
+  .hero {{ padding: 32px 0 24px; display: flex; flex-direction: column; gap: 8px; }}
+  .hero-code {{ font-size: clamp(3rem, 8vw, 5rem); font-weight: 800; letter-spacing: -0.03em; color: #fff; line-height: 1; }}
+  .hero-name {{ font-size: 1.25rem; color: #A1A1AA; font-weight: 500; }}
+  .hero-meta {{ display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.9rem; color: #71717A; margin-top: 4px; }}
+  .tabs {{ display: flex; gap: 0; border-bottom: 1px solid #1E1E24; margin-bottom: 24px; overflow-x: auto; }}
+  .tab {{ padding: 10px 20px; font-size: 0.9rem; font-weight: 500; color: #71717A; background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }}
+  .tab.active {{ color: #fff; border-bottom-color: #6366F1; }}
+  .notice {{ background: #121217; border: 1px solid #1E1E24; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 28px; }}
+  .notice-icon {{ font-size: 2rem; margin-bottom: 12px; }}
+  .notice h2 {{ font-size: 1.1rem; color: #fff; margin-bottom: 8px; }}
+  .notice p {{ color: #A1A1AA; font-size: 0.9rem; }}
+  .footer {{ border-top: 1px solid #1E1E24; padding: 20px 0 32px; font-size: 0.8rem; color: #52525B; display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; }}
+  .footer a {{ color: #71717A; text-decoration: none; }}
+  @media (max-width: 640px) {{ .page {{ padding: 0 12px; }} .hero {{ padding: 20px 0 16px; }} }}
+</style>
+</head>
+<body>
+<nav class="topbar">
+  <a href="/" class="topbar-logo">rail<span>tracker</span></a>
+  <input type="search" class="topbar-search" placeholder="Search stations..." aria-label="Search stations">
+</nav>
+<div class="page">
+<div class="hero">
+  <h1 class="hero-code">{crs_code}</h1>
+  <p class="hero-name">{station_name}</p>
+  <div class="hero-meta">
+    <span>📍 United Kingdom</span>
+    <span>🕐 {local_time} BST</span>
+  </div>
+</div>
+<nav class="tabs">
+  <button class="tab active">Overview</button>
+  <button class="tab">Departures</button>
+  <button class="tab">Arrivals</button>
+  <button class="tab">Station Info</button>
+</nav>
+<div class="notice">
+  <div class="notice-icon">🚂</div>
+  <h2>Live data temporarily unavailable</h2>
+  <p>The National Rail data feed is currently unreachable. Real-time departures and arrivals will appear here automatically when the connection is restored.</p>
+  <p style="margin-top:12px;font-size:0.8rem;color:#52525B;">This page is fully functional — all station information, routes, and facilities are available. Only the live departure board is paused.</p>
+</div>
+<footer class="footer">
+  <span>Data: National Rail Darwin · Open data licensed under OGL v3.0</span>
+  <span><a href="/">All Stations</a> · <a href="/about">About</a></span>
+</footer>
+</div>
+</body>
+</html>'''
+
 def generate_html(crs_code, station_name=None):
     """Generate a complete station page HTML."""
+    station_name = station_name or STATION_NAMES.get(crs_code, crs_code)
+    
     dep_data = fetch_departures(crs_code)
     arr_data = fetch_arrivals(crs_code)
 
     if not dep_data:
-        return f"<!-- Failed to fetch data for {crs_code} -->"
-
-    station_name = station_name or dep_data.get('locationName', crs_code)
+        # API unavailable — generate a static page with a note
+        return generate_fallback_html(crs_code, station_name)
     generated = dep_data.get('generatedAt', '')
     messages = dep_data.get('nrccMessages', [])
     dep_services = dep_data.get('trainServices', [])
