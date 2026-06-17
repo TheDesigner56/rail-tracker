@@ -330,15 +330,17 @@ function renderStation(crs, name, data, mode = 'departures') {
   const isArrivals = mode === 'arrivals';
 
   const rows = services.slice(0, 30).map(s => {
-    const etd = s.isCancelled ? 'Cancelled' : (s.etd === 'On time' ? s.std : s.etd);
-    const statusClass = s.isCancelled ? 'cancelled' : (s.etd === 'On time' ? 'on-time' : 'late');
+    const isLate = !s.isCancelled && s.etd !== 'On time' && s.etd !== s.std;
+    const displayTime = s.isCancelled ? 'Cancelled' : (s.etd === 'On time' ? s.std : s.etd);
+    const statusClass = s.isCancelled ? 'cancelled' : (isLate ? 'late' : 'on-time');
     const opColor = OP_COLORS[s.operatorCode] || '#52525B';
+    const delayNote = isLate ? `<span class="delay">+${Math.round((parseInt(s.etd.split(':')[0])*60+parseInt(s.etd.split(':')[1]) - (parseInt(s.std.split(':')[0])*60+parseInt(s.std.split(':')[1]))))}m</span>` : '';
     return `<tr>
-      <td><span class="time ${statusClass}">${etd}</span><span class="sched">${s.std}</span></td>
+      <td><span class="time ${statusClass}">${displayTime}</span>${delayNote}</td>
       <td><span class="op"><span class="op-dot" style="background:${opColor}"></span>${s.operator}</span></td>
       <td class="dest">${s.destination}</td>
       <td>${s.platform ? `<span class="plat">${s.platform}</span>` : '<span class="plat na">—</span>'}</td>
-      <td><span class="badge ${statusClass}">${s.isCancelled ? '✕' : (s.etd === 'On time' ? '✓' : '⚠')}</span></td>
+      <td><span class="badge ${statusClass}">${s.isCancelled ? '✕' : (isLate ? '⚠' : '✓')}</span></td>
     </tr>`;
   }).join('\n');
 
@@ -392,7 +394,7 @@ function renderStation(crs, name, data, mode = 'departures') {
   tr:hover td{background:#16161D}
   .time{font-weight:600;display:block;line-height:1.3}
   .time.on-time{color:#22C55E}.time.late{color:#F59E0B}.time.cancelled{color:#EF4444;text-decoration:line-through}
-  .sched{font-size:0.7rem;color:#52525B}
+  .delay{font-size:0.7rem;color:#F59E0B;margin-left:4px;font-weight:500}
   .op{display:flex;align-items:center;gap:5px;font-weight:500;font-size:0.8rem;white-space:nowrap}
   .op-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
   .dest{font-size:0.85rem;color:#D4D4D8}
