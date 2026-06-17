@@ -282,8 +282,14 @@ ${stationList}
 </div>
 <script>
 const search=document.getElementById('search'),results=document.getElementById('search-results'),grid=document.getElementById('station-grid');
-let timeout;
-// Loading overlay on station link clicks
+let timeout,cache={};
+// Preload station data when search results appear
+function preloadStation(code){
+  if(!cache[code]){
+    cache[code]=fetch('/api/departures/'+code).then(r=>r.json()).catch(()=>{});
+  }
+}
+// Loading overlay on station link clicks for the full list
 document.querySelectorAll('.station-link').forEach(a=>{a.addEventListener('click',()=>{document.body.innerHTML+='<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(11,11,15,0.7);z-index:999;display:flex;align-items:center;justify-content:center"><div style="width:32px;height:32px;border:3px solid #1E1E24;border-top-color:#6366F1;border-radius:50%;animation:spin 0.8s linear infinite"></div></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>'})});
 search.addEventListener('input',()=>{
   clearTimeout(timeout);
@@ -293,13 +299,20 @@ search.addEventListener('input',()=>{
     const r=await fetch('/api/search?q='+encodeURIComponent(q));
     const d=await r.json();
     if(d.length){
-      results.innerHTML=d.map(s=>'<a href="/station/'+s.code+'" class="search-result"><span class="code">'+s.code+'</span><span class="name">'+s.name+'</span><span class="arrow">→</span></a>').join('');
-      results.classList.add('show');grid.style.display='none'
+      results.innerHTML=d.map(s=>'<a href="/station/'+s.code+'" class="search-result" data-code="'+s.code+'"><span class="code">'+s.code+'</span><span class="name">'+s.name+'</span><span class="arrow">→</span></a>').join('');
+      results.classList.add('show');grid.style.display='none';
+      // Preload data for the top 3 stations in the background
+      d.slice(0,3).forEach(s=>preloadStation(s.code));
     }else{
       results.innerHTML='<div class="no-results">No stations found</div>';
       results.classList.add('show');grid.style.display='none'
     }
   },150)
+});
+// Preload on hover for search results
+results.addEventListener('mouseover',e=>{
+  const link=e.target.closest('.search-result');
+  if(link&&link.dataset.code)preloadStation(link.dataset.code);
 });
 document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap')){results.classList.remove('show');grid.style.display=''}});
 </script>
