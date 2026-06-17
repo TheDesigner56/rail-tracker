@@ -4,18 +4,25 @@ Fast, mobile-first **live UK train tracker** — departures and arrivals for eve
 station in Great Britain, plus full route tracking for individual services. Think
 [bustimes.org](https://bustimes.org), but for the railway.
 
+Light, card-based dashboard UI (inspired by Flighty's Airports product).
+
 ## Features
 
+- **Disruptions landing** — major GB stations on a live map, colour-coded by
+  status, plus a delay table (departure/arrival average delay, on-time %,
+  cancellations and derived alerts).
+- **Station Overview** — per-station dashboard: operational status, departure &
+  arrival on-time performance, most-disrupted routes & operators, busiest
+  routes, current weather, and live board previews.
 - **Live boards** — real-time departures & arrivals for 2,500+ stations, with
-  platforms, delays, cancellations, operator, headcode and coach count. One
-  upstream request per board (fast).
+  platforms, delays, cancellations, operator and headcode. One upstream request
+  per board (fast).
 - **Track any train** — tap a service to open its trip page: every calling point
   with scheduled vs expected times, the train's progress, formation (unit
   numbers), and a live position marker on a map.
-- **Stations near me** — find the closest stations using the browser's location.
 - **Network map** — every station on an interactive map; tap for live times.
 - **Operators** — every train operating company, colour-coded across the app.
-- **Search** — type-ahead station search by name or CRS code, anywhere.
+- **Search** — type-ahead station search by name or CRS code (⌘K), anywhere.
 
 ## Architecture
 
@@ -43,15 +50,16 @@ node index.js            # http://localhost:3000
 
 | Route | Description |
 | --- | --- |
-| `/` | Home: search, near-me, popular & all stations |
-| `/station/:crs` | Live departures (e.g. `/station/PAD`) |
-| `/station/:crs/arrivals` | Live arrivals |
+| `/` | Major Stations & Disruptions (map + delay table) |
+| `/station/:crs` | Station Overview dashboard (e.g. `/station/PAD`) |
+| `/station/:crs/departures` · `/station/:crs/arrivals` | Live boards |
 | `/service/:id` | Service trip page + live map |
 | `/map` | All-stations network map |
 | `/operators`, `/operator/:code` | Operator directory |
+| `/api/disruptions` | Major-station status summary (map + table) |
 | `/api/board/:crs?mode=` | Board JSON |
 | `/api/service/:id` | Live service position + calling points JSON |
-| `/api/nearby?lat=&lon=` | Nearest stations |
+| `/api/weather?lat=&lon=` · `/api/nearby?lat=&lon=` | Weather / nearest stations |
 | `/api/search?q=` · `/api/locations` · `/api/stations` | Lookups |
 
 ## Deployment

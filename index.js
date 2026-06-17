@@ -16,6 +16,8 @@ function cached(key, ttl, fn) {
 }
 const BOARD_TTL = 45_000;
 const SERVICE_TTL = 15_000;
+const OVERVIEW_TTL = 45_000;
+const DISRUPTIONS_TTL = 120_000;
 
 const crsOf = (s) => String(s || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
 
@@ -48,6 +50,20 @@ app.get('/api/board/:crs', (req, res) => serveBoardJson(req, res, req.query.mode
 app.get('/api/departures/:crs', (req, res) => serveBoardJson(req, res, 'departures'));
 app.get('/api/arrivals/:crs', (req, res) => serveBoardJson(req, res, 'arrivals'));
 
+app.get('/api/disruptions', async (req, res) => {
+  try {
+    res.json(await cached('disruptions', DISRUPTIONS_TTL, () => rail.getDisruptions()));
+  } catch (e) {
+    res.status(502).json({ error: 'failed to fetch disruptions' });
+  }
+});
+
+app.get('/api/weather', async (req, res) => {
+  const lat = parseFloat(req.query.lat), lon = parseFloat(req.query.lon);
+  if (isNaN(lat) || isNaN(lon)) return res.status(400).json({ error: 'lat and lon required' });
+  res.json((await rail.getWeather(lat, lon)) || {});
+});
+
 app.get('/api/service/:id', async (req, res) => {
   const id = String(req.params.id).replace(/[^a-zA-Z0-9]/g, '');
   const date = /^\d{4}-\d{2}-\d{2}$/.test(req.query.date || '') ? req.query.date : undefined;
@@ -65,7 +81,7 @@ app.get('/api/service/:id', async (req, res) => {
 });
 
 // ── Pages ──────────────────────────────────────────────────────────────
-app.get('/', (req, res) => res.send(views.renderHome()));
+app.get('/', (req, res) => res.send(views.renderDisruptions()));
 app.get('/about', (req, res) => res.send(views.renderAbout()));
 app.get('/map', (req, res) => res.send(views.renderMap()));
 
@@ -78,18 +94,29 @@ app.get('/operator/:code', (req, res) => {
   res.send(views.renderOperator(code, info, sample));
 });
 
-async function serveStation(req, res, mode) {
+app.get('/station/:crs', async (req, res) => {
+  const crs = crsOf(req.params.crs);
+  if (!rail.stationName(crs)) return res.status(404).send(views.render404(crs));
+  try {
+    const o = await cached(`o:${crs}`, OVERVIEW_TTL, () => rail.getOverview(crs));
+    res.send(views.renderOverview(o));
+  } catch (e) {
+    res.status(502).send(views.renderError('Live data unavailable', `We couldn't reach the data feed for ${rail.stationName(crs)}. Please try again in a moment.`));
+  }
+});
+
+async function serveBoardPage(req, res, mode) {
   const crs = crsOf(req.params.crs);
   if (!rail.stationName(crs)) return res.status(404).send(views.render404(crs));
   try {
     const board = await cached(`b:${crs}:${mode}`, BOARD_TTL, () => rail.getBoard(crs, mode));
-    res.send(views.renderStation(board));
+    res.send(views.renderBoard(board));
   } catch (e) {
     res.status(502).send(views.renderError('Live data unavailable', `We couldn't reach the data feed for ${rail.stationName(crs)}. Please try again in a moment.`));
   }
 }
-app.get('/station/:crs', (req, res) => serveStation(req, res, 'departures'));
-app.get('/station/:crs/arrivals', (req, res) => serveStation(req, res, 'arrivals'));
+app.get('/station/:crs/departures', (req, res) => serveBoardPage(req, res, 'departures'));
+app.get('/station/:crs/arrivals', (req, res) => serveBoardPage(req, res, 'arrivals'));
 
 app.get('/service/:id', async (req, res) => {
   const id = String(req.params.id).replace(/[^a-zA-Z0-9]/g, '');
