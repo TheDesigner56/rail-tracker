@@ -527,7 +527,7 @@ setInterval(()=>{sec--;if(sec<=0){sec=30;location.reload()}document.getElementBy
 // ── Tracker page (SSE to local server) ──
 function renderTracker(serviceId) {
   const safeId = serviceId.replace(/[^a-zA-Z0-9]/g, '');
-  const localSSE = 'https://railtracker.local:3456';  // requires local Mac Mini
+  const localSSE = 'https://192.168.0.36:3456';  // requires local Mac Mini
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"><title>Tracking ${safeId} — Rail Tracker</title><meta name="theme-color" content="#0B0B0F">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -550,7 +550,7 @@ fetch('/api/snapshot/${safeId}').then(r=>r.json()).then(d=>{
   }
 });
 // Then try live SSE from local server
-const evtSource=new EventSource('https://railtracker.local:3456/api/track/${safeId}');
+const evtSource=new EventSource('https://192.168.0.36:3456/api/track/${safeId}');
 evtSource.onmessage=function(e){try{const d=JSON.parse(e.data);
 if(d.type==='connected'){statusText.textContent='Live';statusDot.style.color='#22C55E'}
 if(d.type==='journey'){if(d.station){trainStation.textContent=d.station.name+(d.station.platform?' · Platform '+d.station.platform:'')+(d.station.delay>0?' · +'+d.station.delay+'m':'');trainStatus.textContent=d.status;trainStatus.className='status '+d.status.toLowerCase().replace(/ /g,'-');statusText.textContent=d.status;statusDot.style.color=d.status==='Departed'?'#22C55E':d.status==='Passed'?'#F59E0B':'#6366F1'
