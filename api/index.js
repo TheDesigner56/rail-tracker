@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { findTrains } = require('trainspy');
+const { findTrains } = require('trainspy/dist/src/index.js');
 
 const app = express();
 
