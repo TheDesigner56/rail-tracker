@@ -1,3 +1,5 @@
+server.js
+api/
 node_modules/
 package-lock.json
 logs/
@@ -6,5 +8,3 @@ Thumbs.db
 .vscode/
 .idea/
 .vercel
-.env*.local
-server.js
