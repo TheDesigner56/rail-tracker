@@ -73,7 +73,7 @@ app.get('/api/service/:id', async (req, res) => {
     res.json({
       id: svc.id, status: svc.status, currentStation: svc.currentStation,
       currentPosition: svc.currentPosition, currentDelay: svc.currentDelay, live: svc.live,
-      stops: svc.stops.map((s) => ({ name: s.name, state: s.state, delay: s.delay })),
+      stops: svc.stops.map((s) => ({ name: s.name, state: s.state, delay: s.delay, arr: s.realArr || s.schedArr, arrived: s.arrived })),
     });
   } catch (e) {
     res.status(502).json({ error: `failed to fetch service ${id}` });
