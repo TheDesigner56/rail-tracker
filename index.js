@@ -267,7 +267,7 @@ function renderIndex() {
   .footer a:hover{color:#A1A1AA}
   .footer-links{display:flex;justify-content:center;gap:20px;margin-bottom:8px}
   .no-results{padding:20px;text-align:center;color:#52525B;font-size:0.9rem}
-  .track-col{width:32px}@media(max-width:480px){.hero h1{font-size:1.25rem}.station-link{padding:8px 10px}.hero-stats{flex-wrap:wrap;gap:8px}}
+  @media(max-width:480px){.hero h1{font-size:1.25rem}.station-link{padding:8px 10px}.hero-stats{flex-wrap:wrap;gap:8px}}
 </style>
 </head>
 <body>
@@ -379,8 +379,6 @@ function renderStation(crs, name, data, mode = 'departures') {
       <td>${s.platform ? `<span class="plat">${s.platform}</span>` : '<span class="plat na">—</span>'}</td>
       <td><span class="badge ${statusClass}">${s.isCancelled ? '✕' : (isLate ? '⚠' : '✓')}</span></td>${s.serviceID && !s.isCancelled ? `<td><a href="/track/${s.serviceID}" class="track-btn">🛰</a></td>` : '<td></td>'}</tr>`;
   }).join('\n');
-    </tr>`;
-  }).join('\n');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -454,7 +452,7 @@ function renderStation(crs, name, data, mode = 'departures') {
   .footer a{color:#71717A;text-decoration:none}
   .footer a:hover{color:#A1A1AA}
   .footer-links{display:flex;justify-content:center;gap:16px;margin-bottom:6px}
-  .track-col{width:32px}@media(max-width:480px){
+  @media(max-width:480px){
     .stats{grid-template-columns:repeat(2,1fr);gap:6px}
     .stat{padding:10px 6px}
     .stat-value{font-size:1.1rem}
