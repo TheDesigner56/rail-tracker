@@ -1,2 +1,0 @@
-# No external dependencies — uses only Python stdlib (urllib, json)
-# This file exists for Vercel compatibility
