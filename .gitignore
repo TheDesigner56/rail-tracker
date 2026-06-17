@@ -8,6 +8,11 @@ station-bri.html
 # Python cache
 __pycache__/
 *.pyc
+# Node
+node_modules/
+package-lock.json
+logs/
+
 # OS
 .DS_Store
 Thumbs.db
