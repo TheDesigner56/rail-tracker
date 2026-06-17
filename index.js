@@ -72,7 +72,7 @@ app.get('/api/service/:id', async (req, res) => {
     // Trim for polling clients.
     res.json({
       id: svc.id, status: svc.status, currentStation: svc.currentStation,
-      currentPosition: svc.currentPosition, currentDelay: svc.currentDelay,
+      currentPosition: svc.currentPosition, currentDelay: svc.currentDelay, live: svc.live,
       stops: svc.stops.map((s) => ({ name: s.name, state: s.state, delay: s.delay })),
     });
   } catch (e) {
