@@ -135,6 +135,10 @@ app.get('/', (req, res) => {
   res.send(renderIndex());
 });
 
+app.get('/track/:serviceId', (req, res) => {
+  res.send(renderTracker(req.params.serviceId));
+});
+
 app.get('/station/:crs', async (req, res) => {
   const crs = req.params.crs.toUpperCase().slice(0, 3);
   const name = STATIONS[crs];
@@ -167,6 +171,24 @@ app.get('/station/:crs/arrivals', async (req, res) => {
     res.send(renderStation(crs, name, data, 'arrivals'));
   } catch (err) {
     res.send(renderStationFallback(crs, name));
+  }
+});
+
+app.get('/api/snapshot/:serviceId', async (req, res) => {
+  const serviceId = req.params.serviceId.replace(/[^a-zA-Z0-9]/g, '');
+  try {
+    const { trackOnce } = require('trainspy/dist/src/trackTrain.js');
+    const snapshot = await trackOnce(serviceId);
+    if (!snapshot) {
+      return res.status(404).json({ error: 'No tracking data available' });
+    }
+    res.json({
+      status: snapshot.status,
+      station: snapshot.station,
+      routePoints: snapshot.station?.location ? [[snapshot.station.location.latitude, snapshot.station.location.longitude]] : []
+    });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
   }
 });
 
@@ -245,7 +267,7 @@ function renderIndex() {
   .footer a:hover{color:#A1A1AA}
   .footer-links{display:flex;justify-content:center;gap:20px;margin-bottom:8px}
   .no-results{padding:20px;text-align:center;color:#52525B;font-size:0.9rem}
-  @media(max-width:480px){.hero h1{font-size:1.25rem}.station-link{padding:8px 10px}.hero-stats{flex-wrap:wrap;gap:8px}}
+  .track-col{width:32px}@media(max-width:480px){.hero h1{font-size:1.25rem}.station-link{padding:8px 10px}.hero-stats{flex-wrap:wrap;gap:8px}}
 </style>
 </head>
 <body>
@@ -355,7 +377,8 @@ function renderStation(crs, name, data, mode = 'departures') {
       <td><span class="op"><span class="op-dot" style="background:${opColor}"></span>${s.operator}</span></td>
       <td class="dest">${s.destination}</td>
       <td>${s.platform ? `<span class="plat">${s.platform}</span>` : '<span class="plat na">—</span>'}</td>
-      <td><span class="badge ${statusClass}">${s.isCancelled ? '✕' : (isLate ? '⚠' : '✓')}</span></td>
+      <td><span class="badge ${statusClass}">${s.isCancelled ? '✕' : (isLate ? '⚠' : '✓')}</span></td>${s.serviceID && !s.isCancelled ? `<td><a href="/track/${s.serviceID}" class="track-btn">🛰</a></td>` : '<td></td>'}</tr>`;
+  }).join('\n');
     </tr>`;
   }).join('\n');
 
@@ -418,7 +441,7 @@ function renderStation(crs, name, data, mode = 'departures') {
   .badge{display:inline-block;padding:2px 6px;border-radius:3px;font-size:0.75rem;font-weight:600;min-width:24px;text-align:center}
   .badge.on-time{background:#052E16;color:#22C55E}
   .badge.late{background:#422006;color:#F59E0B}
-  .badge.cancelled{background:#3B0A0A;color:#EF4444}
+  .badge.cancelled{background:#3B0A0A;color:#EF4444}.track-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;background:#1E1E24;color:#A1A1AA;text-decoration:none;font-size:0.85rem;transition:all 0.15s}.track-btn:hover{background:#6366F1;color:#fff}.track-header{text-align:center;font-size:0.7rem;color:#52525B;font-weight:500}.track-col{width:32px}
   .refresh-bar{display:flex;align-items:center;justify-content:center;gap:12px;padding:12px 0;font-size:0.75rem;color:#52525B}
   .refresh-bar button{background:#16161D;border:1px solid #252530;color:#A1A1AA;padding:6px 16px;border-radius:8px;font-size:0.8rem;cursor:pointer}
   .refresh-bar button:hover{background:#1E1E24;color:#E4E4E7}
@@ -431,7 +454,7 @@ function renderStation(crs, name, data, mode = 'departures') {
   .footer a{color:#71717A;text-decoration:none}
   .footer a:hover{color:#A1A1AA}
   .footer-links{display:flex;justify-content:center;gap:16px;margin-bottom:6px}
-  @media(max-width:480px){
+  .track-col{width:32px}@media(max-width:480px){
     .stats{grid-template-columns:repeat(2,1fr);gap:6px}
     .stat{padding:10px 6px}
     .stat-value{font-size:1.1rem}
@@ -476,7 +499,7 @@ function renderStation(crs, name, data, mode = 'departures') {
 </div>
 <div class="table-wrap">
 <table>
-<thead><tr><th>Time</th><th>Operator</th><th>${isArrivals ? 'From' : 'Destination'}</th><th>Plat</th><th></th></tr></thead>
+<thead><tr><th>Time</th><th>Operator</th><th>${isArrivals ? 'From' : 'Destination'}</th><th>Plat</th><th></th><th class="track-col"><span class="track-header">Track</span></th></tr></thead>
 <tbody>${rows}</tbody>
 </table>
 </div>
@@ -501,6 +524,44 @@ setInterval(()=>{sec--;if(sec<=0){sec=30;location.reload()}document.getElementBy
 </script>
 </body>
 </html>`;
+}
+
+// ── Tracker page (SSE to local server) ──
+function renderTracker(serviceId) {
+  const safeId = serviceId.replace(/[^a-zA-Z0-9]/g, '');
+  const localSSE = 'https://railtracker.local:3456';  // requires local Mac Mini
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"><title>Tracking ${safeId} — Rail Tracker</title><meta name="theme-color" content="#0B0B0F">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}html{font-size:16px;-webkit-text-size-adjust:100%}body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Inter',system-ui,sans-serif;background:#0B0B0F;color:#E4E4E7;line-height:1.5;-webkit-font-smoothing:antialiased;height:100vh;overflow:hidden}.topbar{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid #1E1E24;background:#0B0B0F;position:relative;z-index:1000}.back{color:#71717A;text-decoration:none;font-size:1.2rem;padding:4px;flex-shrink:0}.back:hover{color:#E4E4E7}.logo{font-size:1.1rem;font-weight:800;letter-spacing:-0.02em;color:#fff;text-decoration:none}.logo span{color:#6366F1}.status-badge{display:flex;align-items:center;gap:6px;margin-left:auto;font-size:0.8rem;color:#71717A}#map{height:calc(100vh - 105px);width:100%;background:#0B0B0F}.info-panel{position:fixed;bottom:0;left:0;right:0;background:#121217;border-top:1px solid #1E1E24;padding:14px 16px 24px;z-index:1000}.info-panel .station-name{font-size:1rem;font-weight:600;color:#fff}.info-panel .station-detail{font-size:0.8rem;color:#71717A}.info-panel .status{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600;margin-top:6px}.status.departed{background:#1A3A1A;color:#22C55E}.status.passed{background:#3A2A0A;color:#F59E0B}.status.arrived{background:#1A1A3A;color:#6366F1}.leaflet-container{background:#0B0B0F!important}.leaflet-control-zoom a{background:#1E1E24!important;color:#E4E4E7!important;border-color:#252530!important}.leaflet-control-zoom{display:none!important}</style></head><body><nav class="topbar"><a href="javascript:history.back()" class="back">←</a><a href="/" class="logo">rail<span>tracker</span></a><div class="status-badge"><span id="status-dot">◉</span><span id="status-text">Connecting...</span></div></nav><div id="map"></div><div class="info-panel" id="info"><div class="station-name" id="train-name">Train ${safeId}</div><div class="station-detail" id="train-station">Loading...</div><div><span class="status" id="train-status">Connecting</span></div></div>
+<script>
+const map=L.map('map',{zoomControl:false,attributionControl:false}).setView([51.5,-0.12],8);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:18}).addTo(map);
+let trainMarker=null,routeLine=null;
+const statusDot=document.getElementById('status-dot'),statusText=document.getElementById('status-text');
+const trainName=document.getElementById('train-name'),trainStation=document.getElementById('train-station'),trainStatus=document.getElementById('train-status');
+// First get a snapshot, then connect to local SSE
+fetch('/api/snapshot/${safeId}').then(r=>r.json()).then(d=>{
+  if(d.station&&d.station.location){
+    const latlng=[d.station.location.latitude,d.station.location.longitude];
+    trainMarker=L.circleMarker(latlng,{radius:8,color:'#6366F1',fillColor:'#818CF8',fillOpacity:1,weight:2}).addTo(map).bindPopup('<b>'+d.station.name+'</b><br>'+d.status);
+    map.setView(latlng,12);
+    trainStation.textContent=d.station.name+(d.platform?' · Platform '+d.platform:'')+(d.delay>0?' · +'+d.delay+'m':'');
+    trainStatus.textContent=d.status;trainStatus.className='status '+d.status.toLowerCase().replace(/ /g,'-');
+  }
+});
+// Then try live SSE from local server
+const evtSource=new EventSource('https://railtracker.local:3456/api/track/${safeId}');
+evtSource.onmessage=function(e){try{const d=JSON.parse(e.data);
+if(d.type==='connected'){statusText.textContent='Live';statusDot.style.color='#22C55E'}
+if(d.type==='journey'){if(d.station){trainStation.textContent=d.station.name+(d.station.platform?' · Platform '+d.station.platform:'')+(d.station.delay>0?' · +'+d.station.delay+'m':'');trainStatus.textContent=d.status;trainStatus.className='status '+d.status.toLowerCase().replace(/ /g,'-');statusText.textContent=d.status;statusDot.style.color=d.status==='Departed'?'#22C55E':d.status==='Passed'?'#F59E0B':'#6366F1'
+const latlng=[d.station.lat,d.station.lon];if(!trainMarker){trainMarker=L.circleMarker(latlng,{radius:8,color:'#6366F1',fillColor:'#818CF8',fillOpacity:1,weight:2}).addTo(map).bindPopup('<b>'+d.station.name+'</b><br>'+d.status);map.setView(latlng,12)}else{trainMarker.setLatLng(latlng);trainMarker.setPopupContent('<b>'+d.station.name+'</b><br>'+d.status);map.panTo(latlng,{animate:true,duration:0.5})}
+if(d.routePoints&&d.routePoints.length>1){if(routeLine)routeLine.setLatLngs(d.routePoints);else{routeLine=L.polyline(d.routePoints,{color:'#6366F1',weight:2,opacity:0.3,dashArray:'5,5'}).addTo(map)}}}else{trainStation.textContent='No position data'}}
+if(d.type==='information'){statusText.textContent=d.message;statusDot.style.color='#EF4444'}
+if(d.type==='error'){trainStation.textContent='Tracking ended';statusText.textContent='Error';statusDot.style.color='#EF4444'}}catch(err){console.error(err)}};
+evtSource.onerror=function(){statusText.textContent='Snapshot';statusDot.style.color='#F59E0B';};
+</script></body></html>`;
 }
 
 function renderStationFallback(crs, name) {
