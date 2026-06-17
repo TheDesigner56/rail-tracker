@@ -283,6 +283,8 @@ ${stationList}
 <script>
 const search=document.getElementById('search'),results=document.getElementById('search-results'),grid=document.getElementById('station-grid');
 let timeout;
+// Loading overlay on station link clicks
+document.querySelectorAll('.station-link').forEach(a=>{a.addEventListener('click',()=>{document.body.innerHTML+='<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(11,11,15,0.7);z-index:999;display:flex;align-items:center;justify-content:center"><div style="width:32px;height:32px;border:3px solid #1E1E24;border-top-color:#6366F1;border-radius:50%;animation:spin 0.8s linear infinite"></div></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>'})});
 search.addEventListener('input',()=>{
   clearTimeout(timeout);
   const q=search.value.trim();
@@ -408,6 +410,10 @@ function renderStation(crs, name, data, mode = 'departures') {
   .refresh-bar button{background:#16161D;border:1px solid #252530;color:#A1A1AA;padding:6px 16px;border-radius:8px;font-size:0.8rem;cursor:pointer}
   .refresh-bar button:hover{background:#1E1E24;color:#E4E4E7}
   .refresh-bar .countdown{color:#52525B;min-width:60px;text-align:center}
+  .loading-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(11,11,15,0.7);z-index:999;align-items:center;justify-content:center}
+  .loading-overlay.show{display:flex}
+  .loading-spinner{width:32px;height:32px;border:3px solid #1E1E24;border-top-color:#6366F1;border-radius:50%;animation:spin 0.8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
   .footer{border-top:1px solid #1E1E24;padding:16px 0 24px;font-size:0.75rem;color:#52525B;text-align:center}
   .footer a{color:#71717A;text-decoration:none}
   .footer a:hover{color:#A1A1AA}
@@ -473,7 +479,10 @@ function renderStation(crs, name, data, mode = 'departures') {
   <p>Data: National Rail Darwin · Open Government Licence v3.0</p>
 </footer>
 </div>
+<div class="loading-overlay" id="loading"><div class="loading-spinner"></div></div>
 <script>
+document.getElementById('loading').classList.add('show');
+window.addEventListener('load',()=>{setTimeout(()=>{document.getElementById('loading').classList.remove('show')},300)});
 let sec=30;
 setInterval(()=>{sec--;if(sec<=0){sec=30;location.reload()}document.getElementById('countdown').textContent='Refreshing in '+sec+'s'},1000);
 </script>
