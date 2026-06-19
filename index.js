@@ -107,6 +107,21 @@ app.get('/api/plan', async (req, res) => {
     res.status(502).json({ error: 'failed to plan journey' });
   }
 });
+
+// Hand off to a Trainline booking prefilled with the journey: resolves
+// Trainline's location URNs server-side, then deep-links into /book/results
+// (stations + date/time already filled). Falls back to the route page.
+app.get('/go/trainline', async (req, res) => {
+  const from = crsOf(req.query.from), to = crsOf(req.query.to);
+  if (!rail.stationName(from) || !rail.stationName(to)) return res.redirect(302, 'https://www.thetrainline.com/');
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(req.query.date || '') ? req.query.date : undefined;
+  const time = /^\d{2}:\d{2}$/.test(req.query.time || '') ? req.query.time : undefined;
+  try {
+    res.redirect(302, await rail.getTrainlineUrl(from, to, date, time));
+  } catch {
+    res.redirect(302, 'https://www.thetrainline.com/');
+  }
+});
 app.get('/map', (req, res) => res.send(views.renderMap()));
 
 app.get('/operators', (req, res) => res.send(views.renderOperators(rail.operatorList())));
