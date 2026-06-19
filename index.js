@@ -81,8 +81,20 @@ app.get('/api/service/:id', async (req, res) => {
 });
 
 // ── Pages ──────────────────────────────────────────────────────────────
-app.get('/', (req, res) => res.send(views.renderDisruptions()));
+app.get('/', (req, res) => res.send(views.renderHome()));
+app.get('/disruptions', (req, res) => res.send(views.renderDisruptions()));
 app.get('/about', (req, res) => res.send(views.renderAbout()));
+
+app.get('/api/journey', async (req, res) => {
+  const from = crsOf(req.query.from), to = crsOf(req.query.to);
+  if (!rail.stationName(from) || !rail.stationName(to)) return res.status(400).json({ error: 'valid from and to required' });
+  if (from === to) return res.status(400).json({ error: 'from and to must differ' });
+  try {
+    res.json(await cached(`j:${from}:${to}`, 30_000, () => rail.getJourney(from, to)));
+  } catch (e) {
+    res.status(502).json({ error: 'failed to plan journey' });
+  }
+});
 app.get('/map', (req, res) => res.send(views.renderMap()));
 
 app.get('/operators', (req, res) => res.send(views.renderOperators(rail.operatorList())));
