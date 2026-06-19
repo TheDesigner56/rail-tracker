@@ -95,6 +95,18 @@ app.get('/api/journey', async (req, res) => {
     res.status(502).json({ error: 'failed to plan journey' });
   }
 });
+
+// Multi-modal door-to-door planner: rail spine (RTT) + cross-London (TfL).
+app.get('/api/plan', async (req, res) => {
+  const from = crsOf(req.query.from), to = crsOf(req.query.to);
+  if (!rail.stationName(from) || !rail.stationName(to)) return res.status(400).json({ error: 'valid from and to required' });
+  if (from === to) return res.status(400).json({ error: 'from and to must differ' });
+  try {
+    res.json(await cached(`p:${from}:${to}`, 60_000, () => rail.getJourneyPlan(from, to)));
+  } catch (e) {
+    res.status(502).json({ error: 'failed to plan journey' });
+  }
+});
 app.get('/map', (req, res) => res.send(views.renderMap()));
 
 app.get('/operators', (req, res) => res.send(views.renderOperators(rail.operatorList())));
