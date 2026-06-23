@@ -14,7 +14,11 @@ Light, card-based dashboard UI (inspired by Flighty's Airports product).
   — via Transport for London's free Journey Planner, and presented as a
   Citymapper-style multi-leg itinerary with a total door-to-door time. Handles
   direct trains, intra-London hops, regional → London (train → tube) and
-  London → regional (tube → train).
+  London → regional (tube → train). **Live disruption callouts** — the operator
+  service message for an affected tube / Elizabeth line / Overground / DLR leg
+  (from TfL's line-status feed) — surface inline, so you see *"Elizabeth line:
+  no service to Heathrow Terminals…"* without leaving the app. (National Rail
+  operator messages, e.g. Heathrow Express, would need a free Darwin token.)
 - **Disruptions landing** — major GB stations on a live map, colour-coded by
   status, plus a delay table (departure/arrival average delay, on-time %,
   cancellations and derived alerts).
