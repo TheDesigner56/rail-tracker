@@ -36,11 +36,13 @@ app.get('/api/nearby', (req, res) => {
   res.json(rail.nearby(lat, lon, Math.min(parseInt(req.query.n, 10) || 12, 30)));
 });
 
+const atOf = (q) => (/^\d{3,4}$/.test(q || '') ? String(q).padStart(4, '0') : '');
 async function serveBoardJson(req, res, mode) {
   const crs = crsOf(req.params.crs);
   if (!rail.stationName(crs)) return res.status(404).json({ error: 'unknown station' });
+  const at = atOf(req.query.at);
   try {
-    res.json(await cached(`b:${crs}:${mode}`, BOARD_TTL, () => rail.getBoard(crs, mode)));
+    res.json(await cached(`b:${crs}:${mode}:${at || 'now'}`, BOARD_TTL, () => rail.getBoard(crs, mode, at || undefined)));
   } catch (e) {
     res.status(502).json({ error: `failed to fetch board for ${crs}` });
   }
@@ -147,8 +149,9 @@ app.get('/station/:crs', async (req, res) => {
 async function serveBoardPage(req, res, mode) {
   const crs = crsOf(req.params.crs);
   if (!rail.stationName(crs)) return res.status(404).send(views.render404(crs));
+  const at = atOf(req.query.at);
   try {
-    const board = await cached(`b:${crs}:${mode}`, BOARD_TTL, () => rail.getBoard(crs, mode));
+    const board = await cached(`b:${crs}:${mode}:${at || 'now'}`, BOARD_TTL, () => rail.getBoard(crs, mode, at || undefined));
     res.send(views.renderBoard(board));
   } catch (e) {
     res.status(502).send(views.renderError('Live data unavailable', `We couldn't reach the data feed for ${rail.stationName(crs)}. Please try again in a moment.`));
