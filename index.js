@@ -2,6 +2,9 @@ const express = require('express');
 const cors = require('cors');
 const rail = require('./lib/rail');
 const views = require('./lib/views');
+const db = require('./lib/db');
+const push = require('./lib/push');
+const tripcheck = require('./lib/tripcheck');
 
 const app = express();
 app.use(cors());
@@ -124,6 +127,107 @@ app.get('/go/trainline', async (req, res) => {
     res.redirect(302, 'https://www.thetrainline.com/');
   }
 });
+// ── Trip tracker: saved trips + Web Push proactive alerts ──────────────────
+const ownerOf = (s) => String(s || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
+function ukParts() {
+  const p = {};
+  for (const x of new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date())) p[x.type] = x.value;
+  return p;
+}
+
+app.get('/api/push/vapid', (req, res) => res.json({ key: push.publicKey(), enabled: push.configured() }));
+
+app.post('/api/push/subscribe', async (req, res) => {
+  const owner = ownerOf(req.body.owner);
+  const s = req.body.subscription || {};
+  if (!owner || !s.endpoint || !s.keys || !s.keys.p256dh || !s.keys.auth) return res.status(400).json({ error: 'invalid subscription' });
+  try {
+    await db.saveSub({ owner, endpoint: s.endpoint, p256dh: s.keys.p256dh, auth: s.keys.auth, user_agent: String(req.get('user-agent') || '').slice(0, 200) });
+    res.json({ ok: true });
+  } catch (e) { res.status(503).json({ error: 'storage unavailable' }); }
+});
+
+app.post('/api/trips', async (req, res) => {
+  const owner = ownerOf(req.body.owner);
+  const b = req.body || {};
+  if (!owner || !Array.isArray(b.legs) || !b.legs.length || !/^\d{4}-\d{2}-\d{2}$/.test(b.travel_date || '')) return res.status(400).json({ error: 'invalid trip' });
+  try {
+    const trip = await db.saveTrip({
+      owner, name: String(b.name || '').slice(0, 120) || null, travel_date: b.travel_date,
+      origin: String(b.origin || '').slice(0, 120), destination: String(b.destination || '').slice(0, 120),
+      depart: String(b.depart || '').slice(0, 5), arrive: String(b.arrive || '').slice(0, 5),
+      legs: b.legs.slice(0, 12), notified: {},
+    });
+    res.json({ ok: true, trip });
+  } catch (e) { res.status(503).json({ error: 'storage unavailable' }); }
+});
+
+app.get('/api/trips', async (req, res) => {
+  const owner = ownerOf(req.query.owner);
+  if (!owner) return res.json({ trips: [] });
+  res.json({ trips: await db.listTrips(owner) });
+});
+
+app.delete('/api/trips/:id', async (req, res) => {
+  const owner = ownerOf(req.query.owner);
+  if (!owner) return res.status(400).json({ error: 'owner required' });
+  await db.deleteTrip(req.params.id, owner);
+  res.json({ ok: true });
+});
+
+// On-demand check (used by the Trips page to refresh a trip's live status).
+app.post('/api/trips/:id/check', async (req, res) => {
+  const trip = await db.getTrip(req.params.id);
+  if (!trip) return res.status(404).json({ error: 'not found' });
+  try { res.json(await tripcheck.checkTrip(trip)); }
+  catch (e) { res.status(502).json({ error: 'check failed' }); }
+});
+
+// Scheduled checker — invoked by an external cron (Supabase pg_cron / GitHub
+// Actions) every ~15 min. Decides which advance notifications are due and pushes.
+app.get('/api/cron/check', async (req, res) => {
+  if (!process.env.CRON_SECRET || req.query.secret !== process.env.CRON_SECRET) return res.status(403).json({ error: 'forbidden' });
+  const p = ukParts();
+  const today = `${p.year}-${p.month}-${p.day}`;
+  const tmrw = (() => { const d = new Date(`${today}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); })();
+  const nowMin = parseInt(p.hour, 10) * 60 + parseInt(p.minute, 10);
+  let checked = 0, sent = 0;
+  try {
+    const trips = await db.activeTrips();
+    for (const trip of trips) {
+      const done = trip.notified || {};
+      const depMin = /^\d{2}:\d{2}/.test(trip.depart || '') ? parseInt(trip.depart.slice(0, 2), 10) * 60 + parseInt(trip.depart.slice(3, 5), 10) : null;
+      let kind = null;
+      if (trip.travel_date === tmrw && !done.day_before && nowMin >= 1080 && nowMin <= 1290) kind = 'day_before';
+      else if (trip.travel_date === today && depMin != null) {
+        const until = depMin - nowMin;
+        if (!done.predepart && until >= 0 && until <= 75) kind = 'predepart';
+        else if (!done.morning && nowMin >= 360 && nowMin <= 600 && until > 75) kind = 'morning';
+      }
+      if (!kind) continue;
+      checked++;
+      const result = await tripcheck.checkTrip(trip).catch(() => ({ worst: 'ok', issues: [], summary: 'Trip saved.' }));
+      const subs = await db.subsFor(trip.owner);
+      const route = trip.name || `${trip.origin} → ${trip.destination}`;
+      const lead = kind === 'day_before' ? 'Tomorrow' : kind === 'morning' ? 'Today' : 'Leaving soon';
+      const title = `${result.worst === 'major' ? '⚠️ ' : ''}${lead}: ${route}`;
+      const body = result.summary + (result.issues.length > 1 ? ` (+${result.issues.length - 1} more)` : '');
+      for (const sub of subs) {
+        const r = await push.send(sub, { title, body, url: '/trips', tag: `trip-${trip.id}` });
+        if (r.ok) sent++; else if (r.gone) await db.removeSub(sub.endpoint);
+      }
+      await db.markTrip(trip.id, { notified: { ...done, [kind]: true }, last_checked: new Date().toISOString(), last_summary: result.summary });
+    }
+    res.json({ ok: true, trips: trips.length, checked, sent });
+  } catch (e) { res.status(500).json({ error: 'cron failed' }); }
+});
+
+// Service worker (must be served from the origin root for scope) + PWA manifest.
+app.get('/sw.js', (req, res) => res.type('application/javascript').set('Cache-Control', 'no-cache').send(views.SW_JS));
+app.get('/manifest.webmanifest', (req, res) => res.type('application/manifest+json').send(views.MANIFEST_JSON));
+
+app.get('/trips', (req, res) => res.send(views.renderTrips()));
+
 app.get('/map', (req, res) => res.send(views.renderMap()));
 
 app.get('/operators', (req, res) => res.send(views.renderOperators(rail.operatorList())));
