@@ -86,6 +86,26 @@ Optional environment variables:
 | `MAPTILER_KEY` | MapTiler vector-tile key for the maps (a sensible default ships in the code; set your own and restrict it to your domain in production). |
 | `TFL_APP_KEY` | Transport for London API key. The journey planner works key-less, but a free key (from [api-portal.tfl.gov.uk](https://api-portal.tfl.gov.uk)) raises the rate limit for the cross-London last-mile hop. |
 
+## Launch checklist & scaling roadmap
+
+Ready-for-users state: public pages and read-only APIs are **edge-cached**
+(`s-maxage` + `stale-while-revalidate`) so the CDN absorbs repeat traffic;
+upstream fetches retry transient failures; the UI supports dark mode, reduced
+motion and keyboard focus; boards only auto-refresh while the tab is visible.
+
+To go live:
+
+1. Set the env vars above (Supabase integration, `VAPID_PRIVATE_KEY`,
+   `CRON_SECRET`), then schedule `/api/cron/check?secret=…` every ~15 min for
+   trip alerts.
+2. Point a custom domain at the Vercel project; restrict the MapTiler key to it.
+3. Register production apps with TfL (`TFL_APP_KEY`) to raise rate limits.
+
+At serious scale (100k+ users), the roadmap is: move live data from the
+Realtime Trains scrape to the official (free) **Darwin push feed** with a small
+ingestion worker + shared cache (Redis); self-host map tiles; batch the trip
+cron by departure window.
+
 ## Data & attribution
 
 Live running information originates from National Rail / Network Rail and is

@@ -24,18 +24,24 @@ const DISRUPTIONS_TTL = 120_000;
 
 const crsOf = (s) => String(s || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
 
+// Everything here is public and personalisation-free, so let the CDN absorb
+// repeat traffic: cache at the edge for `secs`, serve stale while revalidating.
+const edge = (res, secs, swr = secs * 4) =>
+  res.set('Cache-Control', `public, s-maxage=${secs}, stale-while-revalidate=${swr}`);
+
 // ── API ─────────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', stations: Object.keys(rail.STATIONS).length, operators: Object.keys(rail.TOC).length });
 });
 
-app.get('/api/stations', (req, res) => res.json(rail.allStations()));
-app.get('/api/locations', (req, res) => res.json(rail.allLocations()));
-app.get('/api/search', (req, res) => res.json(rail.searchStations(req.query.q || '')));
+app.get('/api/stations', (req, res) => { edge(res, 86400); res.json(rail.allStations()); });
+app.get('/api/locations', (req, res) => { edge(res, 86400); res.json(rail.allLocations()); });
+app.get('/api/search', (req, res) => { edge(res, 3600); res.json(rail.searchStations(req.query.q || '')); });
 
 app.get('/api/nearby', (req, res) => {
   const lat = parseFloat(req.query.lat), lon = parseFloat(req.query.lon);
   if (isNaN(lat) || isNaN(lon)) return res.status(400).json({ error: 'lat and lon required' });
+  edge(res, 86400);
   res.json(rail.nearby(lat, lon, Math.min(parseInt(req.query.n, 10) || 12, 30)));
 });
 
@@ -45,7 +51,9 @@ async function serveBoardJson(req, res, mode) {
   if (!rail.stationName(crs)) return res.status(404).json({ error: 'unknown station' });
   const at = atOf(req.query.at);
   try {
-    res.json(await cached(`b:${crs}:${mode}:${at || 'now'}`, BOARD_TTL, () => rail.getBoard(crs, mode, at || undefined)));
+    const board = await cached(`b:${crs}:${mode}:${at || 'now'}`, BOARD_TTL, () => rail.getBoard(crs, mode, at || undefined));
+    edge(res, 30);
+    res.json(board);
   } catch (e) {
     res.status(502).json({ error: `failed to fetch board for ${crs}` });
   }
@@ -57,7 +65,9 @@ app.get('/api/arrivals/:crs', (req, res) => serveBoardJson(req, res, 'arrivals')
 
 app.get('/api/disruptions', async (req, res) => {
   try {
-    res.json(await cached('disruptions', DISRUPTIONS_TTL, () => rail.getDisruptions()));
+    const d = await cached('disruptions', DISRUPTIONS_TTL, () => rail.getDisruptions());
+    edge(res, 60);
+    res.json(d);
   } catch (e) {
     res.status(502).json({ error: 'failed to fetch disruptions' });
   }
@@ -66,6 +76,7 @@ app.get('/api/disruptions', async (req, res) => {
 app.get('/api/weather', async (req, res) => {
   const lat = parseFloat(req.query.lat), lon = parseFloat(req.query.lon);
   if (isNaN(lat) || isNaN(lon)) return res.status(400).json({ error: 'lat and lon required' });
+  edge(res, 600);
   res.json((await rail.getWeather(lat, lon)) || {});
 });
 
@@ -74,6 +85,7 @@ app.get('/api/service/:id', async (req, res) => {
   const date = /^\d{4}-\d{2}-\d{2}$/.test(req.query.date || '') ? req.query.date : undefined;
   try {
     const svc = await cached(`s:${id}:${date || 'today'}`, SERVICE_TTL, () => rail.getService(id, date));
+    edge(res, 15);
     // Trim for polling clients.
     res.json({
       id: svc.id, status: svc.status, currentStation: svc.currentStation,
@@ -86,16 +98,18 @@ app.get('/api/service/:id', async (req, res) => {
 });
 
 // ── Pages ──────────────────────────────────────────────────────────────
-app.get('/', (req, res) => res.send(views.renderHome()));
-app.get('/disruptions', (req, res) => res.send(views.renderDisruptions()));
-app.get('/about', (req, res) => res.send(views.renderAbout()));
+app.get('/', (req, res) => { edge(res, 600); res.send(views.renderHome()); });
+app.get('/disruptions', (req, res) => { edge(res, 300); res.send(views.renderDisruptions()); });
+app.get('/about', (req, res) => { edge(res, 3600); res.send(views.renderAbout()); });
 
 app.get('/api/journey', async (req, res) => {
   const from = crsOf(req.query.from), to = crsOf(req.query.to);
   if (!rail.stationName(from) || !rail.stationName(to)) return res.status(400).json({ error: 'valid from and to required' });
   if (from === to) return res.status(400).json({ error: 'from and to must differ' });
   try {
-    res.json(await cached(`j:${from}:${to}`, 30_000, () => rail.getJourney(from, to)));
+    const j = await cached(`j:${from}:${to}`, 30_000, () => rail.getJourney(from, to));
+    edge(res, 30);
+    res.json(j);
   } catch (e) {
     res.status(502).json({ error: 'failed to plan journey' });
   }
@@ -107,7 +121,9 @@ app.get('/api/plan', async (req, res) => {
   if (!rail.stationName(from) || !rail.stationName(to)) return res.status(400).json({ error: 'valid from and to required' });
   if (from === to) return res.status(400).json({ error: 'from and to must differ' });
   try {
-    res.json(await cached(`p:${from}:${to}`, 60_000, () => rail.getJourneyPlan(from, to)));
+    const p = await cached(`p:${from}:${to}`, 60_000, () => rail.getJourneyPlan(from, to));
+    edge(res, 45);
+    res.json(p);
   } catch (e) {
     res.status(502).json({ error: 'failed to plan journey' });
   }
@@ -224,18 +240,19 @@ app.get('/api/cron/check', async (req, res) => {
 
 // Service worker (must be served from the origin root for scope) + PWA manifest.
 app.get('/sw.js', (req, res) => res.type('application/javascript').set('Cache-Control', 'no-cache').send(views.SW_JS));
-app.get('/manifest.webmanifest', (req, res) => res.type('application/manifest+json').send(views.MANIFEST_JSON));
+app.get('/manifest.webmanifest', (req, res) => { edge(res, 86400); res.type('application/manifest+json').send(views.MANIFEST_JSON); });
 
-app.get('/trips', (req, res) => res.send(views.renderTrips()));
+app.get('/trips', (req, res) => { edge(res, 3600); res.send(views.renderTrips()); });
 
-app.get('/map', (req, res) => res.send(views.renderMap()));
+app.get('/map', (req, res) => { edge(res, 3600); res.send(views.renderMap()); });
 
-app.get('/operators', (req, res) => res.send(views.renderOperators(rail.operatorList())));
+app.get('/operators', (req, res) => { edge(res, 3600); res.send(views.renderOperators(rail.operatorList())); });
 app.get('/operator/:code', (req, res) => {
   const code = String(req.params.code || '').toUpperCase().slice(0, 2);
   const info = rail.TOC[code];
   if (!info) return res.status(404).send(views.render404(code));
   const sample = ['PAD', 'KGX', 'EUS', 'VIC', 'WAT', 'LST', 'MAN', 'BHM', 'EDB', 'GLC', 'LDS', 'BRI'].filter((c) => rail.stationName(c));
+  edge(res, 3600);
   res.send(views.renderOperator(code, info, sample));
 });
 
@@ -244,6 +261,7 @@ app.get('/station/:crs', async (req, res) => {
   if (!rail.stationName(crs)) return res.status(404).send(views.render404(crs));
   try {
     const o = await cached(`o:${crs}`, OVERVIEW_TTL, () => rail.getOverview(crs));
+    edge(res, 45);
     res.send(views.renderOverview(o));
   } catch (e) {
     res.status(502).send(views.renderError('Live data unavailable', `We couldn't reach the data feed for ${rail.stationName(crs)}. Please try again in a moment.`));
@@ -256,6 +274,7 @@ async function serveBoardPage(req, res, mode) {
   const at = atOf(req.query.at);
   try {
     const board = await cached(`b:${crs}:${mode}:${at || 'now'}`, BOARD_TTL, () => rail.getBoard(crs, mode, at || undefined));
+    edge(res, 30);
     res.send(views.renderBoard(board));
   } catch (e) {
     res.status(502).send(views.renderError('Live data unavailable', `We couldn't reach the data feed for ${rail.stationName(crs)}. Please try again in a moment.`));
@@ -270,6 +289,7 @@ app.get('/service/:id', async (req, res) => {
   try {
     const svc = await cached(`s:${id}:${date || 'today'}`, SERVICE_TTL, () => rail.getService(id, date));
     if (!svc.route.length) return res.status(404).send(views.renderError('Service not found', 'This service may have finished or the identifier is invalid.'));
+    edge(res, 15);
     res.send(views.renderService(svc));
   } catch (e) {
     res.status(502).send(views.renderError('Tracking unavailable', "We couldn't load this service right now. Please try again."));
@@ -281,10 +301,12 @@ app.get('/track/:id', (req, res) => res.redirect(301, `/service/${req.params.id}
 // ── SEO ─────────────────────────────────────────────────────────────────
 app.get('/robots.txt', (req, res) => {
   const base = `${req.protocol}://${req.get('host')}`;
+  edge(res, 86400);
   res.type('text/plain').send(`User-agent: *\nAllow: /\nSitemap: ${base}/sitemap.xml\n`);
 });
 app.get('/sitemap.xml', (req, res) => {
   const base = `${req.protocol}://${req.get('host')}`;
+  edge(res, 86400);
   const statics = ['/', '/map', '/operators', '/about'];
   const urls = [
     ...statics.map((u) => `  <url><loc>${base}${u}</loc></url>`),
