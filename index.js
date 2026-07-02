@@ -9,6 +9,13 @@ const tripcheck = require('./lib/tripcheck');
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use((req, res, next) => {
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('X-Frame-Options', 'SAMEORIGIN');
+  res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.set('Permissions-Policy', 'geolocation=(self), camera=(), microphone=()');
+  next();
+});
 
 // ── Tiny in-memory cache (best-effort across warm serverless invocations) ──
 const cache = new Map();
