@@ -10,8 +10,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
     "cors": "^2.8.6",
     "express": "^5.2.1",
-    "trainspy": "^2.0.9"
+    "trainspy": "^2.0.9",
+    "web-push": "^3.6.7"
   }
 }
