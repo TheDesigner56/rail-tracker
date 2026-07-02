@@ -102,10 +102,11 @@ To go live:
 2. Point a custom domain at the Vercel project; restrict the MapTiler key to it.
 3. Register production apps with TfL (`TFL_APP_KEY`) to raise rate limits.
 
-At serious scale (100k+ users), the roadmap is: move live data from the
-Realtime Trains scrape to the official (free) **Darwin push feed** with a small
-ingestion worker + shared cache (Redis); self-host map tiles; batch the trip
-cron by departure window.
+At serious scale the data source and cache architecture change in stages —
+the full plan, with the maths and migration triggers, lives in
+[SCALING.md](./SCALING.md): RTT free API now → Darwin LDBWS (Rail Data
+Marketplace) + shared Redis at growth/first-revenue → Darwin Push Port
+ingestion worker at 50k+ daily users.
 
 ## Data & attribution
 
