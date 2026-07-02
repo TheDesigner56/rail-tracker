@@ -17,13 +17,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// ── Tiny in-memory cache (best-effort across warm serverless invocations) ──
-const cache = new Map();
-function cached(key, ttl, fn) {
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.t < ttl) return Promise.resolve(hit.v);
-  return Promise.resolve(fn()).then((v) => { cache.set(key, { v, t: Date.now() }); return v; });
-}
+// ── Cache: shared (Upstash Redis) when configured, per-instance memory otherwise ──
+const { cached } = require('./lib/cache');
 const BOARD_TTL = 45_000;
 const SERVICE_TTL = 15_000;
 const OVERVIEW_TTL = 45_000;
