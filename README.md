@@ -83,6 +83,7 @@ Optional environment variables:
 
 | Variable | Purpose |
 | --- | --- |
+| `RTT_API_USER` / `RTT_API_PASS` | **Recommended.** Credentials for the official [Realtime Trains API](https://api.rtt.io) (free registration). With these set, all live data uses the contracted JSON API; without them the app falls back to scraping the website, which now sits behind a bot challenge and fails from most servers. |
 | `MAPTILER_KEY` | MapTiler vector-tile key for the maps (a sensible default ships in the code; set your own and restrict it to your domain in production). |
 | `TFL_APP_KEY` | Transport for London API key. The journey planner works key-less, but a free key (from [api-portal.tfl.gov.uk](https://api-portal.tfl.gov.uk)) raises the rate limit for the cross-London last-mile hop. |
 
